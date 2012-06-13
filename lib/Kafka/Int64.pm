@@ -8,7 +8,7 @@ use warnings;
 # limited to 32 bits and slow bigint must be used instead. Use subs from this module
 # in such case.
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use bytes;
 use bigint; # this allows integers of practially any size at the cost of significant performance drop
@@ -49,7 +49,7 @@ sub unpackq {
 
     confess $Kafka::ERROR[ERROR_MISMATCH_ARGUMENT] if bytes::length( $s ) != 8;
 
-    return Math::BigInt->from_hex( unpack( "H16", $s ) );
+    return Math::BigInt->from_hex( "0x".unpack( "H16", $s ) );
 }
 
 1;
@@ -63,7 +63,7 @@ the Apache Kafka Wire Format protocol on 32 bit systems
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.01
+This documentation refers to C<Kafka::Int64> version 0.02
 
 =head1 SYNOPSIS
 
@@ -133,7 +133,7 @@ or integer input.
 An argument must be a positive number. That is, it is defined and Perl thinks
 it's a number. The argument may be a L<Math::BigInt|Math::BigInt> integer.
 
-The special values ​​-1, -2 are allowed.
+The special values -1, -2 are allowed.
 
 Returns the value as a packed binary string, or error will cause the program
 to halt (C<confess>) if the argument is not a valid number.

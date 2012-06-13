@@ -18,7 +18,7 @@ our @EXPORT_OK  = qw(
     offsets_response
     );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use bytes;
 use Carp;
@@ -486,12 +486,12 @@ __END__
 
 =head1 NAME
 
-Kafks::Protocol - functions to process messages in the
+Kafka::Protocol - functions to process messages in the
 Apache Kafka's Wire Format
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.01
+This documentation refers to C<Kafka::Consumer> version 0.02
 
 =head1 SYNOPSIS
 
@@ -705,7 +705,7 @@ The argument must be a positive number. That is, it is defined and Perl thinks
 it's a number. The argument may be a L<Math::BigInt|Math::BigInt> integer on 32
 bit system.
 
-The special values ​​-1 (latest), -2 (earliest) are allowed.
+The special values -1 (latest), -2 (earliest) are allowed.
 
 =item C<$max_number>
 

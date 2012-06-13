@@ -6,7 +6,7 @@ use warnings;
 
 use lib 'lib';
 
-use Test::More tests => 18;
+use Test::More tests => 19;
 
 use Kafka::IO;
 
@@ -90,7 +90,7 @@ $server = Kafka::Mock->new(
     timeout     => 0.1,
     );
 $port = $server->port;
-foreach my $timeout ( ( "", "nothing", -1 ) )
+foreach my $timeout ( ( 0, "", "nothing", -1 ) )
 {
     $io = Kafka::IO->new( 
         host        => "localhost",

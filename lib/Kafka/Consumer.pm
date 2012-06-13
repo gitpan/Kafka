@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Consumer
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _POSINT _NUMBER );
@@ -247,11 +247,11 @@ __END__
 
 =head1 NAME
 
-Kafks::Consumer - object interface to the consumer client
+Kafka::Consumer - object interface to the consumer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.01
+This documentation refers to C<Kafka::Consumer> version 0.02
 
 =head1 SYNOPSIS
 
@@ -448,7 +448,7 @@ The argument be a positive number. That is, it is defined and Perl thinks it's
 a number. The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
 system.
 
-The special values ​​-1 (latest), -2 (earliest) are allowed.
+The special values -1 (latest), -2 (earliest) are allowed.
 
 =item C<$max_number>
 

@@ -6,7 +6,7 @@ use warnings;
 
 use lib 'lib';
 
-use Test::More tests => 30;
+use Test::More tests => 32;
 
 BEGIN {
     eval "use Test::Exception";
@@ -34,14 +34,14 @@ isa_ok( $server, 'Kafka::Mock');
 $server->close;
 
 # requests, responses
-foreach my $arg ( ( undef, "", "string", 0, 1, \"scalar", [], sub {} ) )
+foreach my $arg ( ( undef, 0, "", "string", 0, 1, \"scalar", [], sub {} ) )
 {
     dies_ok { Kafka::Mock->new( requests  => $arg ) } "expecting to die (requests  = ".( $arg || "" ).")";
     dies_ok { Kafka::Mock->new( responses => $arg ) } "expecting to die (responses = ".( $arg || "" ).")";
 }
 
 # timeout
-lives_ok { $server = Kafka::Mock->new( timeout => 0 ) } "expecting to live (timeout = 0)";
+lives_ok { $server = Kafka::Mock->new( timeout => 0.1 ) } "expecting to live (timeout = 0)";
 isa_ok( $server, 'Kafka::Mock');
 $server->close;
 

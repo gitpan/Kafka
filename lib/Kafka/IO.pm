@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use sigtrap;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use bytes;
 use Carp;
@@ -57,7 +57,7 @@ sub new {
     (
         _STRING( $self->{host} ) and
         _POSINT( $self->{port} ) and
-        ( _NUMBER( $self->{timeout} ) and $self->{timeout} >= 0 )
+        ( _NUMBER( $self->{timeout} ) and $self->{timeout} > 0 )
     ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
 
     $self->{not_accepted} = 0;
@@ -124,12 +124,12 @@ sub _connect {
     $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl: $!\n";
     fcntl( $connection, F_SETFL, $_ | FD_CLOEXEC ) or die "fnctl: $!\n";
 
-    if( $timeout )
-    {
+#    if( $timeout )
+#    {
         # Set O_NONBLOCK so we can time out connect().
         $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n"; # 0 for error, 0e0 for 0.
         fcntl( $connection, F_SETFL, $_ | O_NONBLOCK ) or die "fcntl F_SETFL O_NONBLOCK: $!\n"; # 0 for error, 0e0 for 0.
-    }
+#    }
 
     # Connect returns immediately because of O_NONBLOCK.
     connect( $connection, pack_sockaddr_in( $port, inet_aton( $ip ) ) ) or $!{EINPROGRESS} or die( "connect ${ip}:${port} (${name}): $!\n" );
@@ -137,7 +137,7 @@ sub _connect {
     $self->{socket}     = $connection;
     $self->{_select}    = undef;
 
-    return $connection unless $timeout;
+#    return $connection unless $timeout;
 
     # Reset O_NONBLOCK.
     $_ = fcntl( $connection, F_GETFL, 0 ) or die "fcntl F_GETFL: $!\n";  # 0 for error, 0e0 for 0.
@@ -295,7 +295,7 @@ server without using the Apache ZooKeeper
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.01
+This documentation refers to C<Kafka::IO> version 0.02
 
 =head1 SYNOPSIS
 

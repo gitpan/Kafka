@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 # kafka server imitation (non-blocking mode)
 
@@ -319,7 +319,7 @@ sub new {
     (
         _HASH0( $self->{requests} ) and
         _HASH0( $self->{responses} ) and
-        defined( _NUMBER( $self->{timeout} ) ) and $self->{timeout} >= 0
+        defined( _NUMBER( $self->{timeout} ) ) and $self->{timeout} > 0
     ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
 
     return $self->_error( ERROR_MISMATCH_ARGUMENT )
@@ -561,7 +561,7 @@ Kafka::Mock - object interface to the TCP mock server for testing
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Mock> version 0.01
+This documentation refers to C<Kafka::Mock> version 0.02
 
 =head1 SYNOPSIS
 

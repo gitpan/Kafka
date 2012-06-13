@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Producer
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _ARRAY0 );
@@ -133,11 +133,11 @@ __END__
 
 =head1 NAME
 
-Kafks::Producer - object interface to the producer client
+Kafka::Producer - object interface to the producer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.01
+This documentation refers to C<Kafka::Producer> version 0.02
 
 =head1 SYNOPSIS
 
