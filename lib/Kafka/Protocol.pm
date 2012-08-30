@@ -18,7 +18,7 @@ our @EXPORT_OK  = qw(
     offsets_response
     );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use bytes;
 use Carp;
@@ -34,7 +34,7 @@ use Kafka qw(
     BITS64
     );
 
-if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }
+if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }  ## no critic
 
 use constant {
     DEBUG                               => 0,
@@ -491,7 +491,7 @@ Apache Kafka's Wire Format
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.02
+This documentation refers to C<Kafka::Consumer> version 0.03
 
 =head1 SYNOPSIS
 
@@ -610,7 +610,7 @@ The following functions are available for C<Kafka::Protocol> module.
 =item *
 
 B<offset>, B<max_size> or B<time>, B<max_number> are the additional information
-that might encode parameters of the messages we want to access.
+that might be encoded parameters of the messages we want to access.
 
 =back
 

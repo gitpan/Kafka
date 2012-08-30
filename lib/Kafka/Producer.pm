@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Producer
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _ARRAY0 );
@@ -137,7 +137,7 @@ Kafka::Producer - object interface to the producer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.02
+This documentation refers to C<Kafka::Producer> version 0.03
 
 =head1 SYNOPSIS
 
@@ -262,7 +262,7 @@ The following methods are defined for the C<Kafka::Producer> class:
 =head3 C<send( $topic, $partition, $messages )>
 
 Sends a messages (coded according to the Apache Kafka Wire Format protocol)
-on a C<Kafka::IO> IO object socket.
+on a C<Kafka::IO> object socket.
 
 Returns 1 if the message is successfully sent. If there's an error, returns
 the undefined value if the C<RaiseError> is not true.
