@@ -1,5 +1,10 @@
 Revision history for Kafka package
 
+0.07  Mon Dec  18 2012
+    FIXES:
+    - Checking OS and Perl version in Makefile.PL
+      CPAN RT #82018: Tests hang on Windows. (reported by Alexandr Ciornii)
+
 0.06  Mon Sep  26 2012
     CHANGES:
     - Refinement of calculation operation time in benchmarks
