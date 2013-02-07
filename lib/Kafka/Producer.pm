@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Producer
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _ARRAY0 );
@@ -137,7 +137,7 @@ Kafka::Producer - object interface to the producer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.09
+This documentation refers to C<Kafka::Producer> version 0.10
 
 =head1 SYNOPSIS
 
@@ -378,7 +378,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012 by TrackingSoft LLC.
+Copyright (C) 2012-2013 by TrackingSoft LLC.
 All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under

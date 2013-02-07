@@ -6,7 +6,7 @@ use warnings;
 
 # Basic functionalities to include a simple Consumer
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Carp;
 use Params::Util qw( _INSTANCE _STRING _NONNEGINT _POSINT _NUMBER );
@@ -251,7 +251,7 @@ Kafka::Consumer - object interface to the consumer client
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.09
+This documentation refers to C<Kafka::Consumer> version 0.10
 
 =head1 SYNOPSIS
 
@@ -345,7 +345,7 @@ Provides an object oriented model of communication.
 
 =item *
 
-Supports parsing the Apache Kafka Wire Format protocol.
+Supports parsing the Apache Kafka 0.7 Wire Format protocol.
 
 =item *
 
@@ -606,7 +606,7 @@ Vlad Marchenko
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2012 by TrackingSoft LLC.
+Copyright (C) 2012-2013 by TrackingSoft LLC.
 All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
