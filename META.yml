@@ -19,7 +19,7 @@ no_index:
     - t
     - inc
 requires:
-  Digest::CRC: 0.18
   Params::Util: 1.04
+  String::CRC32: 1.4
   perl: 5.010
-version: 0.10
+version: 0.11
