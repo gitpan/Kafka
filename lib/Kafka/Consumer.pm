@@ -1,335 +1,129 @@
 package Kafka::Consumer;
 
+=head1 NAME
+
+Kafka::Consumer - Perl interface for 'consumer' client.
+
+=head1 VERSION
+
+This documentation refers to C<Kafka::Consumer> version 0.800_1 .
+
+=cut
+
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
 
-# Basic functionalities to include a simple Consumer
+# ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.12';
+our $VERSION = '0.800_1';
 
-use Carp;
-use Params::Util qw( _INSTANCE _STRING _NONNEGINT _POSINT _NUMBER );
+#-- load the modules -----------------------------------------------------------
+
+use Params::Util qw(
+    _INSTANCE
+    _NONNEGINT
+    _POSINT
+    _STRING
+);
+use Scalar::Util::Numeric qw(
+    isbig
+    isint
+);
 
 use Kafka qw(
-    ERROR_MISMATCH_ARGUMENT
-    ERROR_CANNOT_SEND
-    ERROR_CANNOT_RECV
-    ERROR_NOTHING_RECEIVE
-    ERROR_IN_ERRORCODE
-    BITS64
-    );
-use Kafka::Protocol qw(
-    REQUESTTYPE_FETCH
-    REQUESTTYPE_OFFSETS
-    fetch_request
-    fetch_response
-    offsets_request
-    offsets_response
-    );
+    $BITS64
+    $DEFAULT_MAX_BYTES
+    $DEFAULT_MAX_NUMBER_OF_OFFSETS
+    $DEFAULT_MAX_WAIT_TIME
+    %ERROR
+    $ERROR_COMPRESSED_PAYLOAD
+    $ERROR_MISMATCH_ARGUMENT
+    $ERROR_NO_ERROR
+    $ERROR_PARTITION_DOES_NOT_MATCH
+    $ERROR_TOPIC_DOES_NOT_MATCH
+    $MESSAGE_SIZE_OVERHEAD
+    $MIN_BYTES_RESPOND_IMMEDIATELY
+    $RECEIVE_EARLIEST_OFFSETS
+);
+use Kafka::Internals qw(
+    $APIKEY_FETCH
+    $APIKEY_OFFSET
+    $DEFAULT_RAISE_ERROR
+    _get_CorrelationId
+    last_error
+    last_errorcode
+    RaiseError
+    _fulfill_request
+    _error
+    _connection_error
+    _set_error
+);
+use Kafka::Connection;
 use Kafka::Message;
 
-if ( !BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; }  ## no critic
+if ( !$BITS64 ) { eval 'use Kafka::Int64; 1;' or die "Cannot load Kafka::Int64 : $@"; } ## no critic
 
-our $_last_error;
-our $_last_errorcode;
-
-sub new {
-    my $class   = shift;
-    my $self = {
-        IO              => undef,
-        RaiseError      => 0,
-        };
-
-    my @args = @_;
-    while ( @args )
-    {
-        my $k = shift @args;
-        $self->{ $k } = shift @args if exists $self->{ $k };
-    }
-
-    bless( $self, $class );
-
-    $@ = "";
-    unless ( defined( _NONNEGINT( $self->{RaiseError} ) ) )
-    {
-        $self->{RaiseError} = 0;
-        return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    }
-    $self->{last_error} = $self->{last_errorcode} = $_last_error = $_last_errorcode = undef;
-    _INSTANCE( $self->{IO}, 'Kafka::IO' ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
-
-    return $self;
-}
-
-sub last_error {
-    my $self = shift;
-
-    return $self->{last_error} if defined $self;
-    return $_last_error;
-}
-
-sub last_errorcode {
-    my $self = shift;
-
-    return $self->{last_errorcode} if defined $self;
-    return $_last_errorcode;
-}
-
-sub _error {
-    my $self        = shift;
-    my $error_code  = shift;
-    my $description = shift;
-
-    $self->{last_errorcode} = $_last_errorcode  = $error_code;
-    $self->{last_error}     = $_last_error      = $description || $Kafka::ERROR[ $error_code ];
-    confess $self->{last_error} if $self->{RaiseError} and $self->{last_errorcode} == ERROR_MISMATCH_ARGUMENT;
-    die $self->{last_error} if $self->{RaiseError} or ( $self->{IO} and ( ref( $self->{IO} eq "Kafka::IO" ) and $self->{IO}->RaiseError ) );
-    return;
-}
-
-sub _receive {
-    my $self            = shift;
-    my $request_type    = shift;
-
-    my $response = {};
-    my $message = $self->{IO}->receive( 4 );
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( $message and defined $$message );
-    my $tail = $self->{IO}->receive( unpack( "N", $$message ) );
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( $tail and defined $$tail );
-    $$message .= $$tail;
-
-    my $decoded;
-    if ( $request_type == REQUESTTYPE_FETCH )
-    {
-        $decoded = fetch_response( $message );
-# WARNING: remember the error code of the last received packet
-        unless ( $response->{error_code} = $decoded->{header}->{error_code} )
-        {
-            $response->{messages} = [] unless defined $response->{messages};
-            push @{$response->{messages}}, @{$decoded->{messages}};
-        }
-    }
-    elsif ( $request_type == REQUESTTYPE_OFFSETS )
-    {
-        $decoded = offsets_response( $message );
-# WARNING: remember the error code of the last received packet
-        unless ( $response->{error_code} = $decoded->{header}->{error_code} )
-        {
-            $response->{offsets} = [] unless defined $response->{offsets};
-            push @{$response->{offsets}}, @{$decoded->{offsets}};
-# WARNING: remember the error code of the last received packet
-            $response->{error} = $decoded->{error};
-        }
-    }
-    return $response;
-}
-
-sub fetch {
-    my $self        = shift;
-    my $topic       = _STRING( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    my $partition   = shift;
-    my $offset      = shift;
-    my $max_size    = _POSINT( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) unless defined( _NONNEGINT( $partition ) );
-    ( ref( $offset ) eq "Math::BigInt" and $offset >= 0 ) or defined( _NONNEGINT( $offset ) ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
-
-    my $sent;
-    eval { $sent = $self->{IO}->send( fetch_request( $topic, $partition, $offset, $max_size ) ) };
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( defined $sent );
-
-    my $decoded = {};
-    eval { $decoded = $self->_receive( REQUESTTYPE_FETCH ) };
-    return $self->_error( $self->{last_errorcode}, $self->{last_error} )
-        if ( $self->{last_error} );
-
-    if ( defined $decoded->{messages} )
-    {
-        my $response = [];
-        my $next_offset = $offset;
-        foreach my $message ( @{$decoded->{messages}} )
-        {
-            # To find the offset of the next message,
-            # take the offset of this message (that you made in the request),
-            # and add LENGTH + 4 bytes (length of this message + 4 byte header to represent the length of this message).
-            if ( BITS64 )
-            {
-                $message->{offset} = $next_offset;
-                $next_offset += $message->{length} + 4;
-            }
-            else
-            {
-                $message->{offset} = Kafka::Int64::intsum( $next_offset, 0 );
-                $next_offset = Kafka::Int64::intsum( $next_offset, $message->{length} + 4 );
-            }
-            $message->{next_offset} = $next_offset;
-            push @$response, Kafka::Message->new( $message )
-        }
-        return $response;
-    }
-    elsif ( $decoded->{error_code} )
-    {
-        return $self->_error( ERROR_IN_ERRORCODE, $Kafka::ERROR[ERROR_IN_ERRORCODE].": ".( $Kafka::ERROR_CODE{ $decoded->{error_code} } || $Kafka::ERROR_CODE{ -1 } ) );
-    }
-    else
-    {
-        return $self->_error( ERROR_NOTHING_RECEIVE );
-    }
-}
-
-sub offsets {
-    my $self        = shift;
-    my $topic       = _STRING( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    my $partition   = shift;
-    my $time        = shift;
-    my $max_number  = _POSINT( shift ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) unless defined( _NONNEGINT( $partition ) );
-    ( ref( $time ) eq "Math::BigInt" ) or defined( _NUMBER( $time ) ) or return $self->_error( ERROR_MISMATCH_ARGUMENT );
-    $time = int( $time );
-    return $self->_error( ERROR_MISMATCH_ARGUMENT ) if $time < -2;
-
-    $_last_error        = $_last_errorcode          = undef;
-    $self->{last_error} = $self->{last_errorcode}   = undef;
-
-    my $sent;
-    eval { $sent = $self->{IO}->send( offsets_request( $topic, $partition, $time, $max_number ) ) };
-    return $self->_error( $self->{IO}->last_errorcode, $self->{IO}->last_error )
-        unless ( defined $sent );
-
-    my $decoded = {};
-    eval { $decoded = $self->_receive( REQUESTTYPE_OFFSETS ) };
-    return $self->_error( $self->{last_errorcode}, $self->{last_error} )
-        if ( $self->{last_error} );
-
-    if ( defined $decoded->{offsets} )
-    {
-        my $response = [];
-        push @$response, @{$decoded->{offsets}};
-        return $response;
-    }
-    elsif ( $decoded->{error_code} )
-    {
-        return $self->_error( ERROR_IN_ERRORCODE, $Kafka::ERROR[ERROR_IN_ERRORCODE].": ".( $Kafka::ERROR_CODE{ $decoded->{error_code} } || $Kafka::ERROR_CODE{ -1 } ) );
-    }
-    else
-    {
-        return $self->_error( ERROR_NOTHING_RECEIVE );
-    }
-}
-
-sub close {
-    my $self = shift;
-
-    $self->{IO}->close if ref( $self->{IO} ) eq "Kafka::IO";
-    delete $self->{$_} foreach keys %$self;
-}
-
-sub DESTROY {
-    my $self = shift;
-
-    $self->close;
-}
-
-1;
-
-__END__
-
-=head1 NAME
-
-Kafka::Consumer - object interface to the consumer client
-
-=head1 VERSION
-
-This documentation refers to C<Kafka::Consumer> version 0.12
+#-- declarations ---------------------------------------------------------------
 
 =head1 SYNOPSIS
 
-Setting up:
+    use 5.010;
+    use strict;
+    use warnings;
 
-    #-- IO
-    use Kafka qw( KAFKA_SERVER_PORT DEFAULT_TIMEOUT );
-    use Kafka::IO;
-    
-    my $io;
-    
-    $io = Kafka::IO->new(
-        host        => "localhost",
-        port        => KAFKA_SERVER_PORT,
-        timeout     => DEFAULT_TIMEOUT, # Optional,
-                                        # default = DEFAULT_TIMEOUT
-        RaiseError  => 0                # Optional, default = 0
-        );
+    use Kafka qw(
+        $DEFAULT_MAX_BYTES
+        $DEFAULT_MAX_NUMBER_OF_OFFSETS
+        $RECEIVE_EARLIEST_OFFSETS
+    );
+    use Kafka::Connection;
+    use Kafka::Consumer;
 
-Consumer:
+    #-- Connection
+    my $connect = Kafka::Connection->new( host => 'localhost' );
 
     #-- Consumer
-    use Kafka::Consumer;
-    
-    my $consumer = Kafka::Consumer->new(
-        IO          => $io,
-        RaiseError  => 0    # Optional, default = 0
-        );
-    
+    my $consumer = Kafka::Consumer->new( Connection  => $connect );
+
     # Get a list of valid offsets up max_number before the given time
     my $offsets = $consumer->offsets(
-        "test",             # topic
-        0,                  # partition
-        TIMESTAMP_EARLIEST, # time
-        DEFAULT_MAX_OFFSETS # max_number
-        );
-    if( $offsets )
-    {
-        foreach my $offset ( @$offsets )
-        {
-            print "Received offset: $offset\n";
-        }
+        'mytopic',                      # topic
+        0,                              # partition
+        $RECEIVE_EARLIEST_OFFSETS,      # time
+        $DEFAULT_MAX_NUMBER_OF_OFFSETS  # max_number
+    );
+    if( $offsets ) {
+        say "Received offset: $_" foreach @$offsets;
     }
-    if ( !$offsets or $consumer->last_error )
-    {
-        print STDERR
-            "(", $consumer->last_errorcode, ") ",
-            $consumer->last_error, "\n";
-    }
-    
+    say STDERR 'Error: (', $consumer->last_errorcode, ') ', $consumer->last_error
+        if !$offsets || $consumer->last_errorcode;
+
     # Consuming messages
     my $messages = $consumer->fetch(
-        "test",             # topic
-        0,                  # partition
-        0,                  # offset
-        DEFAULT_MAX_SIZE    # Maximum size of MESSAGE(s) to receive
-        );
-    if ( $messages )
-    {
-        foreach my $message ( @$messages )
-        {
-            if( $message->valid )
-            {
-                print "payload    : ", $message->payload,       "\n";
-                print "offset     : ", $message->offset,        "\n";
-                print "next_offset: ", $message->next_offset,   "\n";
+        'mytopic',                      # topic
+        0,                              # partition
+        0,                              # offset
+        $DEFAULT_MAX_BYTES              # Maximum size of MESSAGE(s) to receive
+    );
+    if ( $messages ) {
+        foreach my $message ( @$messages ) {
+            if( $message->valid ) {
+                say 'payload    : ', $message->payload;
+                say 'key        : ', $message->key;
+                say 'offset     : ', $message->offset;
+                say 'next_offset: ', $message->next_offset;
             }
-            else
-            {
-                print "error      : ", $message->error,         "\n";
+            else {
+                say 'error      : ', $message->error;
             }
         }
     }
-    
-    # Closes the consumer and cleans up
-    $consumer->close;
 
-Use only one C<Kafka::Consumer> object at the same time.
+    # Closes the consumer and cleans up
+    undef $consumer;
 
 =head1 DESCRIPTION
 
@@ -345,13 +139,13 @@ Provides an object oriented model of communication.
 
 =item *
 
-Supports parsing the Apache Kafka 0.7 Wire Format protocol.
+Supports parsing the Apache Kafka 0.8 Wire Format protocol.
 
 =item *
 
 Supports Apache Kafka Requests and Responses (FETCH with
 no compression codec attribute now). Within this module we currently support
-access to FETCH Request, OFFSETS Request, FETCH Response, OFFSETS Response.
+access to FETCH, OFFSETS Requests and Responses.
 
 =item *
 
@@ -360,12 +154,18 @@ on 32 bit systems.
 
 =back
 
-The Kafka consumer response has an ARRAY reference type for C<offsets>, and
+The Kafka consumer response has an ARRAY reference type for C<offsets> and
 C<fetch> methods.
-For the C<offsets> response array has the offset integers, in descending order.
+For the C<offsets> response array has the offset integers.
 
 For the C<fetch> response the array has the class name
 L<Kafka::Message|Kafka::Message> elements.
+
+=cut
+
+our $_package_error;
+
+#-- constructor ----------------------------------------------------------------
 
 =head2 CONSTRUCTOR
 
@@ -375,36 +175,151 @@ Creates new consumer client object. Returns the created C<Kafka::Consumer>
 object.
 
 An error will cause the program to halt or the constructor will return the
-undefined value, depending on the value of the C<RaiseError>
-attribute. You can use the methods of the C<Kafka::Consumer> class
-L</last_errorcode> and L</last_error> for the information about the error.
+C<Kafka::Consumer> object without halt, depending on the value of the C<RaiseError> attribute.
+
+You can use the methods of the C<Kafka::Consumer> class - L</last_errorcode>
+and L</last_error> for information about the error.
 
 C<new()> takes arguments in key-value pairs.
 The following arguments are currently recognized:
 
 =over 3
 
-=item C<IO =E<gt> $io>
+=item C<Connection =E<gt> $connect>
 
-C<$io> is the L<Kafka::IO|Kafka::IO> object that allow you to communicate to
-the Apache Kafka server without using the Apache ZooKeeper service.
+C<$connect> is the L<Kafka::Connection|Kafka::Connection> object that allow you to communicate to
+the Apache Kafka cluster.
 
 =item C<RaiseError =E<gt> $mode>
 
-Optional, default = 0 .
+Optional, default is 0.
 
-An error will cause the program to halt if C<RaiseError>
-is true: C<confess> if the argument is not valid or C<die> in the other
-error case (this can always be trapped with C<eval>).
-
-It must be a non-negative integer. That is, a positive integer, or zero.
+An error will cause the program to halt if L</RaiseError> is true: C<confess>
+if the argument is not valid or C<die> in the other error case
+(this can always be trapped with C<eval>).
 
 You should always check for errors, when not establishing the C<RaiseError>
 mode to true.
 
+=item C<CorrelationId =E<gt> $correlation_id>
+
+Optional, default is C<undef>.
+
+C<Correlation> is a user-supplied integer.
+It will be passed back in the response by the server, unmodified.
+The C<$correlation_id> should be an integer number.
+
+Error is thrown if C<CorrelationId> of request will not match C<CorrelationId> in response.
+
+C<CorrelationId> will be auto-assigned (random negative number) if it was not provided during
+creation of C<Kafka::Producer> object.
+
+=item C<ClientId =E<gt> $client_id>
+
+This is a user supplied identifier (string) for the client application.
+
+C<ClientId> will be auto-assigned if not passed in when creating C<Kafka::Producer> object.
+
+=item C<MaxWaitTime =E<gt> $max_time>
+
+The maximum amount of time (ms) to wait when no sufficient data is available at the time the
+request was issued.
+
+Optional, default is C<$DEFAULT_MAX_WAIT_TIME>.
+
+C<$DEFAULT_MAX_WAIT_TIME> is the default time that can be imported from the
+L<Kafka|Kafka> module.
+
+The C<$max_time> must be a positive integer.
+
+=item C<MinBytes =E<gt> $min_bytes>
+
+RTFM: The minimum number of bytes of messages that must be available to give a response.
+If the client sets this to C<$MIN_BYTES_RESPOND_IMMEDIATELY> the server will always respond
+immediately. If it is set to C<$MIN_BYTES_RESPOND_HAS_DATA>, the server will respond as soon
+as at least one partition has at least 1 byte of data or the specified timeout occurs.
+Setting higher values in combination with the bigger timeouts results in reading larger chunks of data.
+
+Optional, default is C<$MIN_BYTES_RESPOND_IMMEDIATELY>.
+
+C<$MIN_BYTES_RESPOND_IMMEDIATELY>, C<$MIN_BYTES_RESPOND_HAS_DATA> are the defaults that
+can be imported from the L<Kafka|Kafka> module.
+
+The C<$min_bytes> must be a non-negative integer.
+
+=item C<MaxBytes =E<gt> $max_bytes>
+
+The maximum bytes to include in the message set for this partition.
+
+Optional, default = C<$DEFAULT_MAX_BYTES> (1_000_000).
+
+The C<$max_bytes> must be more than C<$MESSAGE_SIZE_OVERHEAD>
+(size of protocol overhead - data added by protocol for each message).
+
+C<$DEFAULT_MAX_BYTES>, C<$MESSAGE_SIZE_OVERHEAD>
+are the defaults that can be imported from the L<Kafka|Kafka> module.
+
+=item C<MaxNumberOfOffsets =E<gt> $max_number>
+
+Kafka is return up to C<$max_number> of offsets.
+
+That is a non-negative integer.
+
+Optional, default = C<$DEFAULT_MAX_NUMBER_OF_OFFSETS> (100).
+
+C<$DEFAULT_MAX_NUMBER_OF_OFFSETS>
+is the default that can be imported from the L<Kafka|Kafka> module.
+
 =back
 
+=cut
+sub new {
+    my ( $class, @args ) = @_;
+
+    my $self = bless {
+        Connection          => undef,
+        RaiseError          => $DEFAULT_RAISE_ERROR,
+        CorrelationId       => undef,
+        ClientId            => undef,
+        MaxWaitTime         => $DEFAULT_MAX_WAIT_TIME,
+        MinBytes            => $MIN_BYTES_RESPOND_IMMEDIATELY,
+        MaxBytes            => $DEFAULT_MAX_BYTES,
+        MaxNumberOfOffsets  => $DEFAULT_MAX_NUMBER_OF_OFFSETS,
+    }, $class;
+
+    while ( @args )
+    {
+        my $k = shift @args;
+        $self->{ $k } = shift @args if exists $self->{ $k };
+    }
+
+    $self->{CorrelationId}  //= _get_CorrelationId;
+    $self->{ClientId}       //= 'consumer';
+
+    if ( !defined _NONNEGINT( $self->RaiseError ) ) {
+        $self->{RaiseError} = $DEFAULT_RAISE_ERROR;
+        $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RaiseError' );
+    }
+    elsif ( !_INSTANCE( $self->{Connection}, 'Kafka::Connection' ) )                    { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'Connection' ); }
+    elsif ( !( defined( $self->{CorrelationId} ) && isint( $self->{CorrelationId} ) ) ) { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' ); }
+    elsif ( !( $self->{ClientId} eq q{} || defined( _STRING( $self->{ClientId} ) ) && !utf8::is_utf8( $self->{ClientId} ) ) )   { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'ClientId' ); }
+    elsif ( !( defined( $self->{MaxWaitTime} ) && isint( $self->{MaxWaitTime} ) && $self->{MaxWaitTime} > 0 ) ) { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxWaitTime' ); }
+    elsif ( !defined( _NONNEGINT( $self->{MinBytes} ) ) )                               { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MinBytes' ); }
+    elsif ( !( _POSINT( $self->{MaxBytes} ) && $self->{MaxBytes} >= $MESSAGE_SIZE_OVERHEAD ) )      { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxBytes' ); }
+    elsif ( !defined( _POSINT( $self->{MaxNumberOfOffsets} ) ) )                        { $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxNumberOfOffsets' ); }
+    else {
+        $self->_error( $ERROR_NO_ERROR )
+            if $self->last_error;
+    }
+
+    return $self;
+}
+
+#-- public attributes ----------------------------------------------------------
+
 =head2 METHODS
+
+The following methods are defined for the C<Kafka::Consumer> class:
 
 =over 3
 
@@ -418,44 +333,9 @@ we want to access.
 
 The following methods are defined for the C<Kafka::Consumer> class:
 
-=head3 C<offsets( $topic, $partition, $time, $max_number )>
+=cut
 
-Get a list of valid offsets up C<$max_number> before the given time.
-
-Returns the offsets response array of the offset integers, in descending order
-(L<Math::BigInt|Math::BigInt> integers on 32 bit system). If there's an error,
-returns the undefined value if the C<RaiseError> is not true.
-
-C<offsets()> takes arguments. The following arguments are currently recognized:
-
-=over 3
-
-=item C<$topic>
-
-The C<$topic> must be a normal non-false string of non-zero length.
-
-=item C<$partition>
-
-The C<$partition> must be a non-negative integer (of any length).
-That is, a positive integer, or zero.
-
-=item C<$time>
-
-C<$time> is the timestamp of the offsets before this time - milliseconds since
-UNIX Epoch.
-
-The argument be a positive number. That is, it is defined and Perl thinks it's
-a number. The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
-system.
-
-The special values -1 (latest), -2 (earliest) are allowed.
-
-=item C<$max_number>
-
-C<$max_number> is the maximum number of offsets to retrieve. The argument must
-be a positive integer (of any length).
-
-=back
+#-- public methods -------------------------------------------------------------
 
 =head3 C<fetch( $topic, $partition, $offset, $max_size )>
 
@@ -463,8 +343,8 @@ Get a list of messages to consume one by one up C<$max_size> bytes.
 
 Returns the reference to array of the  L<Kafka::Message|Kafka::Message> class
 name elements.
-If there's an error, returns the undefined value if the C<RaiseError> is
-not true.
+If there's an error,
+returns the reference to empty array if the C<RaiseError> is not true.
 
 C<fetch()> takes arguments. The following arguments are currently recognized:
 
@@ -476,121 +356,291 @@ The C<$topic> must be a normal non-false string of non-zero length.
 
 =item C<$partition>
 
-The C<$partition> must be a non-negative integer (of any length).
-That is, a positive integer, or zero.
+The C<$partition> must be a non-negative integer.
 
 =item C<$offset>
 
 Offset in topic and partition to start from (64 bits).
 
-The argument must be a non-negative integer (of any length).
-That is, a positive integer, or zero. The argument may be a
+Optional. The argument must be a non-negative integer. The argument may be a
 L<Math::BigInt|Math::BigInt> integer on 32 bit system.
 
 =item C<$max_size>
 
-C<$max_number> is the maximum size of the message set to return. The argument
-be a positive integer (of any length).
+C<$max_size> is the maximum size of the message set to return. The argument
+must be a positive integer.
 The maximum size of a request limited by C<MAX_SOCKET_REQUEST_BYTES> that
 can be imported from L<Kafka|Kafka> module.
 
 =back
 
-=head3 C<close>
+=cut
+sub fetch {
+    my ( $self, $topic, $partition, $offset, $max_size ) = @_;
 
-The method to close the C<Kafka::Consumer> object and clean up.
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    elsif ( !( defined( $offset ) && ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
+    elsif ( defined( $max_size ) && !( _POSINT( $max_size ) && $max_size >= $MESSAGE_SIZE_OVERHEAD ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
 
-=head3 C<last_errorcode>
+    my $request = {
+        ApiKey                              => $APIKEY_FETCH,
+        CorrelationId                       => $self->{CorrelationId},
+        ClientId                            => $self->{ClientId},
+        MaxWaitTime                         => $self->{MaxWaitTime},
+        MinBytes                            => $self->{MinBytes},
+        topics                              => [
+            {
+                TopicName                   => $topic,
+                partitions                  => [
+                    {
+                        Partition           => $partition,
+                        FetchOffset         => $offset,
+                        MaxBytes            => $max_size // $self->{MaxBytes},
+                    },
+                ],
+            },
+        ],
+    };
 
-This method returns an error code that specifies the position of the
-description in the C<@Kafka::ERROR> array.  Analysing this information
-can be done to determine the cause of the error.
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
 
-The server or the resource might not be available, access to the resource
-might be denied or other things might have failed for some reason.
+    my $response = $self->_fulfill_request( $request )
+        or return;
 
-=head3 C<last_error>
+    my $messages = [];
+    foreach my $received_topic ( @{ $response->{topics} } ) {
+        $received_topic->{TopicName} eq $topic
+            or return $self->_error( $ERROR_TOPIC_DOES_NOT_MATCH, "'$topic' ne '".$received_topic->{TopicName}."'" );
+        foreach my $received_partition ( @{ $received_topic->{partitions} } ) {
+            $received_partition->{Partition} == $partition
+                or return $self->_error( $ERROR_PARTITION_DOES_NOT_MATCH, "$partition != ".$received_partition->{Partition} );
+            my $HighwaterMarkOffset = $received_partition->{HighwaterMarkOffset};
+            foreach my $Message ( @{ $received_partition->{MessageSet} } ) {
+                my ( $offset, $next_offset, $message_error );
+                if ( $BITS64 ) {
+                    $offset = $Message->{Offset};
+                    $next_offset += $offset + 1;
+                }
+                else {
+                    $offset = Kafka::Int64::intsum( $offset, 0 );
+                    $next_offset = Kafka::Int64::intsum( $offset, 1 );
+                }
+                $message_error = $Message->{Attributes} ? $ERROR{ $ERROR_COMPRESSED_PAYLOAD } : q{};
 
-This method returns an error message that contains information about the
-encountered failure.  Messages returned from this method may contain
-additional details and do not comply with the C<Kafka::ERROR> array.
+                push( @$messages, Kafka::Message->new( {
+                        Attributes          => $Message->{Attributes},
+                        MagicByte           => $Message->{MagicByte},
+                        key                 => $Message->{Key},
+                        payload             => $Message->{Value},
+                        offset              => $offset,
+                        next_offset         => $next_offset,
+                        error               => $message_error,
+                        valid               => !$message_error,
+                        HighwaterMarkOffset => $HighwaterMarkOffset,
+                    } )
+                );
+            }
+        }
+    }
 
-=head1 DIAGNOSTICS
+    return $messages;
+}
 
-Look at the C<RaiseError> description for additional information on
-error handeling.
+=head3 C<offsets( $topic, $partition, $time, $max_number )>
 
-The methods for the possible error to analyse: L</last_errorcode> and
-more descriptive L</last_error>.
+Get a list of valid offsets up C<$max_number> before the given time.
+
+Returns reference to the offsets response array of the offset integers
+(L<Math::BigInt|Math::BigInt> integers on 32 bit system).
+If there's an error,
+returns the reference to empty array if the C<RaiseError> is not true.
+
+C<offsets()> takes arguments. The following arguments are currently recognized:
 
 =over 3
 
-=item C<Mismatch argument>
+=item C<$topic>
 
-This means that you didn't give the right argument to a C<new>
-L<constructor|/CONSTRUCTOR> or to other L<method|/METHODS>.
+The C<$topic> must be a normal non-false string of non-zero length.
 
-=item C<Nothing to receive>
+=item C<$partition>
 
-This means that there are no messages matching your request.
+The C<$partition> must be a non-negative integer.
 
-=item C<Response contains an error in 'ERROR_CODE'>
+=item C<$time>
 
-This means that the response to a request contains an error code in the box
-ERROR_CODE. The error description is available through the method
-L</last_error>.
+Used to ask for all messages before a certain time (ms).
+C<$time> is the timestamp of the offsets before this time - milliseconds since
+UNIX Epoch.
 
-=item C<Can't send>
+The argument must be a positive number.
+The argument may be a L<Math::BigInt|Math::BigInt> integer on 32 bit
+system.
 
-This means that the request can't be sent on a C<Kafka::IO> object socket.
+The special values C<$RECEIVE_LATEST_OFFSET> (-1), C<$RECEIVE_EARLIEST_OFFSETS> (-2) are allowed.
 
-=item C<Can't recv>
+C<$RECEIVE_LATEST_OFFSET>, C<$RECEIVE_EARLIEST_OFFSETS>
+are the defaults that can be imported from the L<Kafka|Kafka> module.
 
-This means that the response can't be received on a C<Kafka::IO>
-IO object socket.
+=item C<$max_number>
 
-=item IO errors
+C<$max_number> is the maximum number of offsets to retrieve.
 
-Look at L<Kafka::IO|Kafka::IO> L<DIAGNOSTICS|Kafka::IO/"DIAGNOSTICS"> section
-to obtain information about IO errors.
+Optional. The argument must be a positive integer.
 
 =back
 
-For more error description, always look at the message from the L</last_error>
-method or from the C<Kafka::Consumer::last_error> class method.
+=cut
+sub offsets {
+    my ( $self, $topic, $partition, $time, $max_number ) = @_;
+
+    if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
+    elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
+    elsif ( !( defined( $time ) && ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
+    elsif ( defined( $max_number ) && !_POSINT( $max_number ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
+
+    my $request = {
+        ApiKey                              => $APIKEY_OFFSET,
+        CorrelationId                       => $self->{CorrelationId},
+        ClientId                            => $self->{ClientId},
+        topics                              => [
+            {
+                TopicName                   => $topic,
+                partitions                  => [
+                    {
+                        Partition           => $partition,
+                        Time                => $time,
+                        MaxNumberOfOffsets  => $max_number // $self->{MaxNumberOfOffsets},
+                    },
+                ],
+            },
+        ],
+    };
+
+    my $response = $self->_fulfill_request( $request )
+        or return;
+
+    my $offsets = [];
+    foreach my $received_topic ( @{ $response->{topics} } ) {
+        foreach my $partition_offsets ( @{ $received_topic->{PartitionOffsets} } ) {
+            push @$offsets, @{ $partition_offsets->{Offset} };
+        }
+    }
+
+    $self->_error( $ERROR_NO_ERROR )
+        if $self->last_error;
+
+    return $offsets;
+}
+
+#-- private attributes ---------------------------------------------------------
+
+#-- private methods ------------------------------------------------------------
+
+#-- Closes and cleans up -------------------------------------------------------
+
+1;
+
+__END__
+
+=head3 C<RaiseError>
+
+This method returns current value showing how errors are handled within Kafka module.
+If set to true, die() is dispatched when error during communication is detected.
+
+C<last_errorcode> and C<last_error> are diagnostic methods and can be used to get detailed
+error codes and messages for various cases: when server or the resource is not available,
+access to the resource was denied, etc.
+
+=head3 C<last_errorcode>
+
+Returns code of the last error.
+
+=head3 C<last_error>
+
+Returns an error message that contains information about the encountered failure.
+
+=head1 DIAGNOSTICS
+
+Review documentation of the L</RaiseError> method for additional information about possible errors.
+
+It's advised to always check L</last_errorcode> and more descriptive L</last_error> when
+L</RaiseError> is not set.
+
+=over 3
+
+=item C<Invalid argument>
+
+Invalid argument passed to a C<new> L<constructor|/CONSTRUCTOR> or other L<method|/METHODS>.
+
+=item C<Can't send>
+
+Message can't be sent using L<Kafka::IO|Kafka::IO> object socket.
+
+=item C<Can't recv>
+
+Message can't be received using L<Kafka::IO|Kafka::IO> object socket.
+
+=item C<Can't bind>
+
+TCP connection can't be established on the given host and port.
+
+=item C<Can't get metadata>
+
+Failed to obtain metadata from kafka servers
+
+=item C<Leader not found>
+
+Missing information about server-leader in metadata.
+
+=item C<Mismatch CorrelationId>
+
+C<CorrelationId> of response doesn't match one in request.
+
+=item C<There are no known brokers>
+
+Resulting metadata has no information about cluster brokers.
+
+=item C<Can't get metadata>
+
+Received metadata has incorrect internal structure.
+
+=back
+
+For more detailed error explanation call L</last_error> method of C<Kafka::Consumer> object.
 
 =head1 SEE ALSO
 
 The basic operation of the Kafka package modules:
 
-L<Kafka|Kafka> - constants and messages used by the Kafka package modules
+L<Kafka|Kafka> - constants and messages used by the Kafka package modules.
 
-L<Kafka::IO|Kafka::IO> - object interface to socket communications with
-the Apache Kafka server
+L<Kafka::Connection|Kafka::Connection> - interface to connect to a Kafka cluster.
 
-L<Kafka::Producer|Kafka::Producer> - object interface to the producer client
+L<Kafka::Producer|Kafka::Producer> - interface for producing client.
 
-L<Kafka::Consumer|Kafka::Consumer> - object interface to the consumer client
+L<Kafka::Consumer|Kafka::Consumer> - interface for consuming client.
 
-L<Kafka::Message|Kafka::Message> - object interface to the Kafka message
-properties
-
-L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
-Apache Kafka's wire format
+L<Kafka::Message|Kafka::Message> - interface to access Kafka message properties.
 
 L<Kafka::Int64|Kafka::Int64> - functions to work with 64 bit elements of the
-protocol on 32 bit systems 
+protocol on 32 bit systems.
 
-L<Kafka::Mock|Kafka::Mock> - object interface to the TCP mock server for testing
+L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
+Apache Kafka's Protocol.
 
-A wealth of detail about the Apache Kafka and Wire Format:
+L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
 
-Main page at L<http://incubator.apache.org/kafka/>
+L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+by several package modules.
 
-Wire Format at L<http://cwiki.apache.org/confluence/display/KAFKA/Wire+Format/>
+A wealth of detail about the Apache Kafka and the Kafka Protocol:
 
-Writing a Driver for Kafka at
-L<http://cwiki.apache.org/confluence/display/KAFKA/Writing+a+Driver+for+Kafka>
+Main page at L<http://kafka.apache.org/>
+
+Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
 
 =head1 AUTHOR
 
@@ -607,7 +657,6 @@ Vlad Marchenko
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2012-2013 by TrackingSoft LLC.
-All rights reserved.
 
 This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at

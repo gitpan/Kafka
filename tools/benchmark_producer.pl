@@ -1,67 +1,54 @@
 #!/usr/bin/perl -w
 
+# NAME: Producer test
+
+#-- Pragmas --------------------------------------------------------------------
+
 use 5.010;
 use strict;
 use warnings;
 
-# NAME: Producer test
+use lib qw(
+    lib
+    ../lib
+);
 
-use lib 'lib';
-use bytes;
-use Time::HiRes     qw( gettimeofday );
+# ENVIRONMENT ------------------------------------------------------------------
+
+#-- load the modules -----------------------------------------------------------
+
 use Getopt::Long;
+use Time::HiRes qw(
+    gettimeofday
+);
 
-# PRECONDITIONS ----------------------------------------------------------------
-
-#-- verify load the module
-use Kafka qw(
-    DEFAULT_TIMEOUT
-    );
-use Kafka::IO;
+use Kafka::Connection;
 use Kafka::Producer;
 
-#-- declaration of variables to test
-my (
-    $io,
-    $producer,
-    $messages,
-    $total,
-    $request_size,
-    $delta,
-    @copy,
-    $in_package,
-    $number_of_package_mix,
-    @tmp_bench,
-    );
+#-- setting up facilities ------------------------------------------------------
 
-my $host                = "localhost",
-my $topic               = undef;
-my $partitions          = undef;
-my $timeout             = DEFAULT_TIMEOUT;
-
-my @chars = ( " ", "A" .. "Z", "a" .. "z", 0 .. 9, qw(! @ $ % ^ & *) );
+my $host                = 'localhost',
+my $port                = undef;
+my $topic               = 'mytopic';
+my $partitions          = 1;
 my $msg_len             = 200;
-my $number_of_package   = undef;
+my $number_of_messages  = 10_000;
 
-my %bench = ();
+my ( $ret, $help );
 
-my $help;
+$ret = GetOptions(
+    'host=s'        => \$host,
+    'port=i'        => \$port,
+    'topic=s'       => \$topic,
+    'partitions=i'  => \$partitions,
+    'messages=i'    => \$number_of_messages,
+    'length=i'      => \$msg_len,
+    'help|?'        => \$help,
+);
 
-#-- setting up facilities
-
-my $ret = GetOptions(
-    "host=s"        => \$host,
-    "topic=s"       => \$topic,
-    "partitions=i"  => \$partitions,
-    "messages=i"    => \$number_of_package,
-    "length=i"      => \$msg_len,
-    "help|?"        => \$help,
-    );
-
-if ( !$ret or $help or !$topic or !$partitions or !$number_of_package )
-{
+if ( !$ret || $help || !$host || !$port || !$topic || !$partitions || !$number_of_messages || !$msg_len ) {
     print <<HELP;
-Usage: $0 --topic="..." --partitions=... --messages=... [--host="..."] [--length=...]
+Usage: $0 [--host="..."] --port=... [--topic="..."] [--partitions=...] [--messages=...] [--length=...]
 
 Send messages to random paritions of a given topic
 
@@ -69,129 +56,112 @@ Options:
     --help
         Display this help and exit
 
+    --host="..."
+        Apache Kafka host to connect to
+    --port=...
+        Apache Kafka port to connect to
     --topic="..."
         topic name
     --partitions=...
         number of partitions to use
-    --host="..."
-        Apache Kafka host to connect to
     --messages=...
         number of messages to send
     --length=...
         length of messages
 HELP
+
     exit 1;
 }
 
-unless ( $io = Kafka::IO->new(
-    host    => $host,
-    timeout => $timeout,
-    ) )
-{
-    print STDERR "Kafka::IO->new: (".Kafka::IO::last_errorcode().") ".Kafka::IO::last_error();
+#-- declarations ---------------------------------------------------------------
+
+my ( $connect, $producer, $messages, $messages_sent, $dispatch_time, $mbs );
+
+sub exit_on_error {
+    my ( $message ) = @_;
+
+    say STDERR $message;
     exit 1;
-}
-
-unless ( $producer = Kafka::Producer->new( IO => $io ) )
-{
-    print STDERR "Kafka::Producer->new: (".Kafka::Producer::last_errorcode().") ".Kafka::Producer::last_error();
-    exit 1;
-}
-
-#-- definition of the functions
-
-sub send_messages {
-    my $producer    = shift;
-    my $topic       = shift;
-    my $partition   = shift;
-    my $messages    = shift;
-
-    my ( $time_before, $time_after );
-    $time_before = gettimeofday;
-    my $ret = $producer->send( $topic, $partition, $messages );
-    $time_after = gettimeofday;
-    if ( $ret )
-    {
-        return $time_after - $time_before;
-    }
-    else
-    {
-        print STDERR "send: (".$producer->last_errorcode.") ".$producer->last_error;
-        exit 1;
-    }
 }
 
 sub random_strings {
-    my $chars       = shift;
-    my $msg_len     = shift;
-    my $number_of   = shift;
+    my @chars = ( ' ', 'A'..'Z', 'a'..'z', 0..9, qw( ! @ $ % ^ & * ) );
 
-    print STDERR "generation of messages can take a while\n";
+    print STDERR 'generation of messages can take a while';
     my @strings;
-    $strings[ $number_of - 1 ] = undef;
-    foreach my $i ( 0 .. ( $number_of - 1 ) )
-    {
-        $strings[ $i ] = join( "", @chars[ map { rand @$chars } ( 1 .. $msg_len ) ]);
+    $strings[ $number_of_messages - 1 ] = undef;
+    foreach my $i ( 0..( $number_of_messages - 1 ) ) {
+        $strings[ $i ] = join( q{}, @chars[ map { rand @chars } ( 1..$msg_len ) ] );
     }
-    return \@strings, $number_of * $msg_len;
+
+    return \@strings;
 }
+
+sub send_message {
+    my ( $partition, $message ) = @_;
+
+    my ( $ret, $time_before, $time_after );
+    $time_before = gettimeofday();
+    $ret = $producer->send( $topic, $partition, $message );
+    $time_after = gettimeofday();
+    exit_on_error( 'send: ('.$producer->last_errorcode.') '.$producer->last_error )
+        unless $ret;
+
+    return $time_after - $time_before;
+}
+
+#-- Global data ----------------------------------------------------------------
+
+!( $connect  = Kafka::Connection->new( host => $host, port => $port ) )->last_errorcode || exit_on_error( 'Kafka::Connect->new: ('.$connect->last_errorcode.') '.$connect->last_error );
+!( $producer = Kafka::Producer->new( Connection => $connect ) )->last_errorcode || exit_on_error( 'Kafka::Producer->new: ('.$producer->last_errorcode.') '.$producer->last_error );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
-$in_package = $number_of_package;
+$messages       = random_strings();
+$messages_sent  = 0;
+$dispatch_time  = 0;
 
-#-- Mix
-$number_of_package_mix = $in_package;
-( $messages, $total ) = random_strings( \@chars, $msg_len, $in_package );
-@copy = (); push @copy, @$messages;
-$request_size = $in_package * 9 + $total;
+while (1) {
+    print STDERR "\rmessage sending one by one, please wait...\r";
+    foreach my $idx ( 0..( $number_of_messages - 1 ) ) {
+        $dispatch_time += send_message( int( rand( $partitions ) ), $messages->[ $idx ] );
 
-$bench{send_mix} = 0;
-
-while (1)
-{
-    print STDERR "message sending one by one, please wait...\n";
-    my $secs = 0;
-    foreach my $idx ( 0 .. ( $in_package - 1 ) )
-    {
-        $bench{send_mix} += send_messages( $producer, $topic, int( rand( $partitions ) ), [ $copy[ $idx ] ] );
-
-# decoration
-        my $num = $idx + 1;
-        unless ( $num % 1000 )
-        {
-            $secs = $bench{send_mix};
-            my $mbs = ( $num * $msg_len ) / ( 1024 * 1024 );
-
-            print STDERR "[", scalar localtime, "] ",
-                "Sent $num messages ",
-                "(".sprintf( "%.3f", $mbs )." MB), ",
-                ( $secs ) ? sprintf( "%d", int( $num / $secs ) ) : "N/A", " messages/sec ",
-                "(".( $secs ? ( sprintf( "%.3f", $mbs / $secs ) ) : "N/A" )." MB/sec)",
-                " " x 10;
-            print STDERR ( $num % 10000 ) ? "\r" : "\n";
+        # decoration
+        unless ( ( my $num = $idx + 1 ) % 1000 ) {
+            $mbs = ( $num * $msg_len ) / ( 1024 * 1024 );
+            print( STDERR
+                sprintf( '[%s] Sent %d messages (%.3f MB) %s messages/sec (%s MB/sec)',
+                    scalar localtime,
+                    $num,
+                    $mbs,
+                    $dispatch_time ? sprintf( '%d',   int( $num / $dispatch_time ) ) : 'N/A',
+                    $dispatch_time ? sprintf( '%.3f', $mbs / $dispatch_time )        : 'N/A'
+                ),
+                ' ' x 10,
+                "\r",
+            );
         }
     }
+    $messages_sent += $number_of_messages;
 
-    my $_send = $bench{send_mix};
-    last if $_send;
-
-    $number_of_package_mix += $in_package;
-    push @$messages, @copy;
+    last if $dispatch_time; # achieved significant time
 }
 
 # POSTCONDITIONS ---------------------------------------------------------------
 
 # Closes and cleans up
-$producer->close;
+
+undef $producer;
+undef $connect;
 
 # Statistics
-my $msgs = scalar @$messages;
-my $mbs = 0; map { $mbs += bytes::length( $_ ) } @$messages; $mbs /= 1024 * 1024;
-my $secs = $bench{send_mix};
-print STDERR "[", scalar localtime, "] Total: ",
-    "Sent $msgs messages ",
-    "(".sprintf( "%.3f", $mbs )." MB), ",
-    $secs ? sprintf( "%d", int( $msgs / $secs ) ) : "N/A", " messages/sec ",
-    "(".( $secs ? ( sprintf( "%.3f", $mbs / $secs ) ) : "N/A" )." MB/sec)",
-    "\n";
+
+$mbs = ( $messages_sent * $msg_len ) / ( 1024 * 1024 );
+say( STDERR sprintf( '[%s] Total: Sent %d messages (%.3f MB), %d messages/sec (%.3f MB/sec)',
+        scalar localtime,
+        $messages_sent,
+        $mbs,
+        int( $messages_sent / $dispatch_time ),
+        $mbs / $dispatch_time,
+    ),
+);
