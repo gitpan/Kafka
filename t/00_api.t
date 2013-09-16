@@ -151,6 +151,7 @@ BEGIN {
         RaiseError
         _fulfill_request
         _error
+        _isbig
         _connection_error
         _set_error
     ) ];

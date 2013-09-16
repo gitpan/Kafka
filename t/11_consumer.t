@@ -82,7 +82,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
         foreach my $bad_value ( @bad_values ) {
             undef $consumer;
             $@ = undef;
-            $consumer = eval { Kafka::Consumer->new(
+            eval { $consumer = Kafka::Consumer->new(
                 Connection          => $connect,
                 RaiseError          => $RaiseError,
                 CorrelationId       => undef,
@@ -110,7 +110,7 @@ sub fetch_ERROR_MISMATCH_ARGUMENT {
         undef $messages;
         $@ = undef;
         ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->fetch(
+        eval { $messages = $consumer->fetch(
             $topic,
             $partition,
             $offset,
@@ -135,7 +135,7 @@ sub offsets_ERROR_MISMATCH_ARGUMENT {
         undef $offsets;
         $@ = undef;
         ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->offsets(
+        eval { $messages = $consumer->offsets(
             $topic,
             $partition,
             $time,
@@ -179,7 +179,7 @@ sub communication_error {
         undef $messages;
         $@ = undef;
         ok !$consumer->last_errorcode(), 'no error';
-        $messages = eval { $consumer->fetch(
+        eval { $messages = $consumer->fetch(
             $topic,
             $partition,
             0,
@@ -200,7 +200,7 @@ sub communication_error {
         undef $offsets;
         $@ = undef;
         ok !$consumer->last_errorcode(), 'no error';
-        $offsets = eval { $consumer->offsets(
+        eval { $offsets = $consumer->offsets(
             $topic,
             $partition,
             $RECEIVE_LATEST_OFFSET,

@@ -31,4 +31,4 @@ requires:
   String::CRC32: 1.4
   Sys::SigAction: 0.15
   perl: 5.010
-version: 0.800_1
+version: 0.800_2

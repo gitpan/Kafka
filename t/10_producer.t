@@ -79,7 +79,7 @@ sub new_ERROR_MISMATCH_ARGUMENT {
         foreach my $bad_value ( @bad_values ) {
             undef $producer;
             $@ = undef;
-            $producer = eval { Kafka::Producer->new(
+            eval { $producer = Kafka::Producer->new(
                 Connection      => $connect,
                 RaiseError      => $RaiseError,
                 CorrelationId   => undef,
@@ -105,7 +105,7 @@ sub send_ERROR_MISMATCH_ARGUMENT {
         undef $response;
         $@ = undef;
         ok !$producer->last_errorcode(), 'no error';
-        $response = eval { $producer->send(
+        eval { $response = $producer->send(
             $topic,
             $partition,
             $messages,
@@ -145,16 +145,19 @@ sub communication_error {
         } );
 
         undef $response;
-        $@ = undef;
         ok !$producer->last_errorcode(), 'no error';
-        $response = eval { $producer->send(
-            $topic,
-            $partition,
-            'Single message',
-        ) };
+        $@ = undef;
+        eval {
+            $response = $producer->send(
+                $topic,
+                $partition,
+                'Single message',
+            );
+        };
         if ( $RaiseError ) {
             ok $@, "\$@ changed";
         }
+
         ok $producer->last_errorcode(), 'an error is detected';
         ok $producer->last_error(), 'expected error';
         ok !defined( $response ), 'response is not received';

@@ -6,7 +6,7 @@ Kafka::Producer -  interface to the 'producer' client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.800_1 .
+This documentation refers to C<Kafka::Producer> version 0.800_2 .
 
 =cut
 
@@ -18,10 +18,11 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 #-- load the modules -----------------------------------------------------------
 
+use Carp;
 use Params::Util qw(
     _ARRAY0
     _INSTANCE
@@ -341,9 +342,11 @@ sub send {
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;
 
-    if ( my $response = $self->_fulfill_request( $request ) ) {
+    my $response;
+    if ( eval { $response = $self->_fulfill_request( $request ) } ) {
         return $response;
     }
+    confess $self->last_error if $self->RaiseError;
 
     return;
 }

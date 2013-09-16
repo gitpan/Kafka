@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 0.800_1 .
+This documentation refers to C<Kafka::Internals> version 0.800_2 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 use Exporter qw(
     import
@@ -35,6 +35,7 @@ our @EXPORT_OK = qw(
     last_error
     last_errorcode
     RaiseError
+    _isbig
     _connection_error
     _error
     _fulfill_request
@@ -46,6 +47,9 @@ our @EXPORT_OK = qw(
 
 use Carp;
 use Const::Fast;
+use Params::Util qw(
+    _INSTANCE
+);
 use Scalar::Util qw(
     dualvar
 );
@@ -233,7 +237,8 @@ sub _fulfill_request {
 
     my $connection = $self->{Connection};
     local $@;
-    if ( my $response = eval { $connection->receive_response_to_request( $request ) } ) {
+    my $response;
+    if ( eval { $response = $connection->receive_response_to_request( $request ) } ) {
         return $response;
     }
     else {
@@ -269,13 +274,12 @@ sub _connection_error {
 
     return if $errorcode == $ERROR_NO_ERROR;
 
-    my $error       = $connection->last_error;
-    $self->_set_error( $errorcode, $error );
+    $self->_set_error( $errorcode, $connection->last_error );
 
     return if !$self->RaiseError && !$connection->RaiseError;
 
-    if    ( $errorcode == $ERROR_MISMATCH_ARGUMENT )    { confess $error; }
-    else                                                { die $error; }
+    if    ( $errorcode == $ERROR_MISMATCH_ARGUMENT )    { confess $self->last_error; }
+    else                                                { die $self->last_error; }
 }
 
 # Sets internal variable describing error
@@ -284,6 +288,13 @@ sub _set_error {
 
     no strict 'refs';   ## no critic
     ${ ref( $self ).'::_package_error' } = dualvar $error_code, $description;
+}
+
+# Verifies that the argument is of type Math::BigInt
+sub _isbig {
+    my ( $num ) = @_;
+
+    return defined _INSTANCE( $num, 'Math::BigInt' );
 }
 
 1;

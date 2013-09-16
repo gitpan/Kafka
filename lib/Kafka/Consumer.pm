@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for 'consumer' client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.800_1 .
+This documentation refers to C<Kafka::Consumer> version 0.800_2 .
 
 =cut
 
@@ -18,10 +18,11 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 #-- load the modules -----------------------------------------------------------
 
+use Carp;
 use Params::Util qw(
     _INSTANCE
     _NONNEGINT
@@ -29,7 +30,6 @@ use Params::Util qw(
     _STRING
 );
 use Scalar::Util::Numeric qw(
-    isbig
     isint
 );
 
@@ -58,6 +58,7 @@ use Kafka::Internals qw(
     RaiseError
     _fulfill_request
     _error
+    _isbig
     _connection_error
     _set_error
 );
@@ -380,7 +381,7 @@ sub fetch {
 
     if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
     elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-    elsif ( !( defined( $offset ) && ( isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
+    elsif ( !( defined( $offset ) && ( _isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' ); }
     elsif ( defined( $max_size ) && !( _POSINT( $max_size ) && $max_size >= $MESSAGE_SIZE_OVERHEAD ) )  { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_size' ); }
 
     my $request = {
@@ -406,8 +407,16 @@ sub fetch {
     $self->_error( $ERROR_NO_ERROR )
         if $self->last_error;
 
-    my $response = $self->_fulfill_request( $request )
-        or return;
+    my $response;
+    eval { $response = $self->_fulfill_request( $request ) };
+    unless ( $response ) {
+        if ( $self->RaiseError ) {
+            confess $self->last_error;
+        }
+        else {
+            return;
+        }
+    }
 
     my $messages = [];
     foreach my $received_topic ( @{ $response->{topics} } ) {
@@ -419,8 +428,8 @@ sub fetch {
             my $HighwaterMarkOffset = $received_partition->{HighwaterMarkOffset};
             foreach my $Message ( @{ $received_partition->{MessageSet} } ) {
                 my ( $offset, $next_offset, $message_error );
+                $offset = $Message->{Offset};
                 if ( $BITS64 ) {
-                    $offset = $Message->{Offset};
                     $next_offset += $offset + 1;
                 }
                 else {
@@ -498,7 +507,7 @@ sub offsets {
 
     if    ( !( $topic eq q{} || defined( _STRING( $topic ) ) && !utf8::is_utf8( $topic ) ) )    { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' ); }
     elsif ( !( defined( $partition ) && isint( $partition ) ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' ); }
-    elsif ( !( defined( $time ) && ( isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
+    elsif ( !( defined( $time ) && ( _isbig( $time ) || isint( $time ) ) && $time >= $RECEIVE_EARLIEST_OFFSETS ) )   { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$time' ); }
     elsif ( defined( $max_number ) && !_POSINT( $max_number ) )                                 { return $self->_error( $ERROR_MISMATCH_ARGUMENT, '$max_number' ); }
 
     my $request = {
@@ -519,8 +528,11 @@ sub offsets {
         ],
     };
 
-    my $response = $self->_fulfill_request( $request )
-        or return;
+    my $response;
+    unless ( eval { $response = $self->_fulfill_request( $request ) } ) {
+        confess $self->last_error if $self->RaiseError && $self->last_error;
+        return;
+    }
 
     my $offsets = [];
     foreach my $received_topic ( @{ $response->{topics} } ) {

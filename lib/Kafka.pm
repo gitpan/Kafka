@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_1 .
+This documentation refers to C<Kafka> package version 0.800_2 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 use Exporter qw(
     import
@@ -443,9 +443,11 @@ None by default.
 Additional constants are available for import, which can be used to define some
 type of parameters, and to identify various error cases.
 
-=over
-
 =cut
+
+=pod
+
+=over
 
 =item C<$KAFKA_SERVER_PORT>
 
@@ -878,11 +880,6 @@ our %ERROR = (
     $ERROR_STALE_CONTROLLER_EPOCH_CODE      => q{Stale Controller Epoch Code},
     $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => q{Specified metadata offset is too big},
 );
-
-=pod
-
-Support for working with 64 bit elements of the Kafka Wire Format protocol
-on 32 bit systems:
 
 =over
 

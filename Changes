@@ -1,5 +1,10 @@
 Revision history for Kafka package
 
+0.800_2 Mon Sep  16 2013
+
+    BUGFIXES:
+    - Fixed to make it working on Perl 5.10 and over.
+
 0.800_1 Fri Sep  06 2013
 
     !!! This is a major upgrade that changes API. It's strongly advised to study

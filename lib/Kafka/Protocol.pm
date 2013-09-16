@@ -6,7 +6,7 @@ Kafka::Protocol - functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.800_1 .
+This documentation refers to C<Kafka::Protocol> version 0.800_2 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 use Exporter qw(
     import
@@ -75,7 +75,6 @@ use Kafka qw(
     $RECEIVE_LATEST_OFFSET
     $WAIT_WRITTEN_TO_LOCAL_LOG
 );
-use Kafka::Int64;
 use Kafka::Internals qw(
     $APIKEY_FETCH
     $APIKEY_METADATA
@@ -320,7 +319,7 @@ if ( $BITS64 ) {
     *_pack64            = sub { pack( q{q>}, $_[0] ) };
 }
 else {
-    eval q{ use Kafka::Int64; }                 ## no critic
+    eval q{ require Kafka::Int64; }                 ## no critic
         or die "Cannot load Kafka::Int64 : $@";
 
     $_int64_template    = q{a[8]};

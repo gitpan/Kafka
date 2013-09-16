@@ -7,7 +7,7 @@ protocol on 32 bit systems.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Int64> version 0.800_1 .
+This documentation refers to C<Kafka::Int64> version 0.800_2 .
 
 =cut
 
@@ -21,7 +21,7 @@ use bigint; # this allows integers of practially any size at the cost of signifi
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_1';
+our $VERSION = '0.800_2';
 
 use Exporter qw(
     import
@@ -167,7 +167,11 @@ Returns the value as a L<Math::BigInt|Math::BigInt> integer.
 sub unpackq {
     my ( $s ) = @_;
 
-    return Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
+    my $ret = Math::BigInt->from_hex( '0x'.unpack( q{H16}, $s ) );
+    $ret = -1 if $ret == 18446744073709551615;
+    $ret = -2 if $ret == 18446744073709551614;
+
+    return $ret;
 }
 
 #-- private functions ----------------------------------------------------------
