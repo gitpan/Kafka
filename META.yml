@@ -30,5 +30,6 @@ requires:
   Scalar::Util::Numeric: 0.22
   String::CRC32: 1.4
   Sys::SigAction: 0.15
+  Try::Tiny: 0.18
   perl: 5.010
-version: 0.800_2
+version: 0.800_3

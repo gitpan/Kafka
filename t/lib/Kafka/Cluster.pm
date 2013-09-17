@@ -6,7 +6,7 @@ Kafka::Cluster - object interface to manage a test kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Cluster> version 0.800_2 .
+This documentation refers to C<Kafka::Cluster> version 0.800_3 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_2';
+our $VERSION = '0.800_3';
 
 use Exporter qw(
     import
@@ -62,6 +62,7 @@ use Params::Util qw(
     _STRING
 );
 use Proc::Daemon;
+use Try::Tiny;
 
 use Kafka::IO;
 
@@ -541,8 +542,8 @@ sub start {
     # Try sending request to make sure that Kafka server is really, really working now
     my $attempts = $MAX_ATTEMPT * 2;
     while( $attempts-- ) {
-        eval {
-
+        my $error;
+        try {
             my $io = Kafka::IO->new(
                 host       => 'localhost',
                 port       => $port,
@@ -572,19 +573,18 @@ sub start {
 #     6E:6F:74:5F:72:65:70:6C:69:63:  #   content = 'not_replicable_topic'
 #     61:62:6C:65:5F:74:6F:70:69:63
 #     ] the end of the first element of 'topics' the array
-
             $io->send( pack( 'H*', '000000300003000000000000000C746573742D726571756573740000000100146E6F745F7265706C696361626C655F746F706963' ) );
+
             my $response = $io->receive( 4 );
             my $tail = $io->receive( unpack( "N", $$response ) );
             $$response .= $$tail;
             $io->close;
+        } catch {
+            confess "Could not send control message: $_\n" unless $attempts;
+            ++$error;
         };
-        if( my $error = $@ ) {
-            confess "Could not send control message: $error\n" unless $attempts;
-        }
-        else {
-            last;
-        }
+
+        last unless $error;
         sleep 1;
     }
 }

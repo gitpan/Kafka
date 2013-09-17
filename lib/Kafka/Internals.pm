@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 0.800_2 .
+This documentation refers to C<Kafka::Internals> version 0.800_3 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_2';
+our $VERSION = '0.800_3';
 
 use Exporter qw(
     import
@@ -53,6 +53,7 @@ use Params::Util qw(
 use Scalar::Util qw(
     dualvar
 );
+use Try::Tiny;
 
 use Kafka qw(
     %ERROR
@@ -236,15 +237,16 @@ sub _fulfill_request {
     my ( $self, $request ) = @_;
 
     my $connection = $self->{Connection};
-    local $@;
     my $response;
-    if ( eval { $response = $connection->receive_response_to_request( $request ) } ) {
-        return $response;
-    }
-    else {
+    try {
+        $response = $connection->receive_response_to_request( $request );
+    };
+    unless ( $response ) {
         $self->_connection_error;
         return;
     }
+
+    return $response;
 }
 
 # Handler for errors not tied with network communication

@@ -25,6 +25,7 @@ my %config = (
         'Scalar::Util::Numeric' => 0.22,
         'String::CRC32'         => '1.4',
         'Sys::SigAction'        => 0.15,
+        'Try::Tiny'             => 0.18,
         },
     BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
         'Capture::Tiny'         => 0.22,

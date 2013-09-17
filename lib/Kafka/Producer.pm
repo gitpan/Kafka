@@ -6,7 +6,7 @@ Kafka::Producer -  interface to the 'producer' client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Producer> version 0.800_2 .
+This documentation refers to C<Kafka::Producer> version 0.800_3 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_2';
+our $VERSION = '0.800_3';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -33,6 +33,7 @@ use Params::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
+use Try::Tiny;
 
 use Kafka qw(
     %ERROR
@@ -343,12 +344,15 @@ sub send {
         if $self->last_error;
 
     my $response;
-    if ( eval { $response = $self->_fulfill_request( $request ) } ) {
-        return $response;
+    try {
+        $response = $self->_fulfill_request( $request );
+    };
+    unless ( $response ) {
+        confess $self->last_error if $self->RaiseError;
+        return;
     }
-    confess $self->last_error if $self->RaiseError;
 
-    return;
+    return $response;
 }
 
 #-- private attributes ---------------------------------------------------------

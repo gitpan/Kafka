@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.800_3 Tue Sep  17 2013
+    CHANGES:
+    - Use Try::Tiny for proper preservation of $@ .
+
 0.800_2 Mon Sep  16 2013
 
     BUGFIXES:

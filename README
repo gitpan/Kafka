@@ -1,4 +1,4 @@
-Kafka package version 0.800_2
+Kafka package version 0.800_3
 =============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -34,6 +34,7 @@ Kafka:
    Scalar::Util::Numeric
    String::CRC32
    Sys::SigAction
+   Try::Tiny
 
 The Kafka package has the following optional dependencies:
 

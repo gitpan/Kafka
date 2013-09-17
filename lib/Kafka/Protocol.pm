@@ -6,7 +6,7 @@ Kafka::Protocol - functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.800_2 .
+This documentation refers to C<Kafka::Protocol> version 0.800_3 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_2';
+our $VERSION = '0.800_3';
 
 use Exporter qw(
     import

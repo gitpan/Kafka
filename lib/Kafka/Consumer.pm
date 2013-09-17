@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for 'consumer' client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.800_2 .
+This documentation refers to C<Kafka::Consumer> version 0.800_3 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_2';
+our $VERSION = '0.800_3';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -32,6 +32,7 @@ use Params::Util qw(
 use Scalar::Util::Numeric qw(
     isint
 );
+use Try::Tiny;
 
 use Kafka qw(
     $BITS64
@@ -408,14 +409,12 @@ sub fetch {
         if $self->last_error;
 
     my $response;
-    eval { $response = $self->_fulfill_request( $request ) };
+    try {
+        $response = $self->_fulfill_request( $request );
+    };
     unless ( $response ) {
-        if ( $self->RaiseError ) {
-            confess $self->last_error;
-        }
-        else {
-            return;
-        }
+        confess $self->last_error if $self->RaiseError;
+        return;
     }
 
     my $messages = [];
@@ -529,8 +528,11 @@ sub offsets {
     };
 
     my $response;
-    unless ( eval { $response = $self->_fulfill_request( $request ) } ) {
-        confess $self->last_error if $self->RaiseError && $self->last_error;
+    try {
+        $response = $self->_fulfill_request( $request );
+    };
+    unless ( $response ) {
+        confess $self->last_error if $self->RaiseError;
         return;
     }
 
