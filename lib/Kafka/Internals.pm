@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 0.800_3 .
+This documentation refers to C<Kafka::Internals> version 0.800_4 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_3';
+our $VERSION = '0.800_4';
 
 use Exporter qw(
     import
@@ -32,15 +32,8 @@ our @EXPORT_OK = qw(
     $DEFAULT_RAISE_ERROR
     $MAX_SOCKET_REQUEST_BYTES
     $PRODUCER_ANY_OFFSET
-    last_error
-    last_errorcode
-    RaiseError
     _isbig
-    _connection_error
-    _error
-    _fulfill_request
     _get_CorrelationId
-    _set_error
 );
 
 #-- load the modules -----------------------------------------------------------
@@ -50,15 +43,11 @@ use Const::Fast;
 use Params::Util qw(
     _INSTANCE
 );
-use Scalar::Util qw(
-    dualvar
-);
 use Try::Tiny;
 
 use Kafka qw(
     %ERROR
     $ERROR_MISMATCH_ARGUMENT
-    $ERROR_NO_ERROR
 );
 
 #-- declarations ---------------------------------------------------------------
@@ -77,7 +66,7 @@ use Kafka qw(
 
 =head1 DESCRIPTION
 
-This module is not a user module.
+This module is private and should not be used directly.
 
 In order to achieve better performance, functions of this module do
 not perform arguments validation.
@@ -87,13 +76,6 @@ not perform arguments validation.
 The following constants are available for export
 
 =cut
-
-=head3 C<$DEFAULT_RAISE_ERROR>
-
-Default value for C<RaiseError>, meaning to not drop exception.
-
-=cut
-const our $DEFAULT_RAISE_ERROR                  => 0;
 
 #-- Api Keys
 
@@ -155,18 +137,12 @@ const our $PRODUCER_ANY_OFFSET                  => 0;
 
 =head3 C<$MAX_CORRELATIONID>
 
-Largest positive integer on 32-bit machines
+Largest positive integer on 32-bit machines.
 
 =cut
 const my  $MAX_CORRELATIONID                    => 2**31 - 1;
 
 #-- public functions -----------------------------------------------------------
-
-=head3 FUNCTIONS
-
-The following functions are available for C<Kafka::Internals> module.
-
-=cut
 
 #-- private functions ----------------------------------------------------------
 
@@ -175,129 +151,20 @@ sub _get_CorrelationId {
     return( -int( rand( $MAX_CORRELATIONID ) ) );
 }
 
+# Verifies that the argument is of Math::BigInt type
+sub _isbig {
+    my ( $num ) = @_;
+
+    return defined _INSTANCE( $num, 'Math::BigInt' );
+}
+
 #-- public attributes ----------------------------------------------------------
-
-=head3 C<last_errorcode>
-
-This method returns an error code that specifies the description in the
-C<%Kafka::ERROR> hash. Analysing this information can be done to determine the
-cause of the error.
-
-=cut
-sub last_errorcode {
-    my $class = ref( $_[0] ) || $_[0];
-
-    no strict 'refs';   ## no critic
-    return( ( ${ $class.'::_package_error' } // 0 ) + 0 );
-}
-
-=head3 C<last_error>
-
-This method returns an error message that contains information about the
-encountered failure. Messages may contain additional details and do not
-coincide completely with the C<%Kafka::ERROR> hash.
-
-=cut
-sub last_error {
-    my $class = ref( $_[0] ) || $_[0];
-
-    no strict 'refs';   ## no critic
-    return( ( ${ $class.'::_package_error' } // q{} ).q{} );
-}
-
-=head3 C<RaiseError>
-
-This method returns a value of the mode responding to the error.
-
-C<RaiseError> leads set an internal attribute describing the error,
-when an error is detected if C<RaiseError> set to false,
-or to die automatically if C<RaiseError> set to true
-(this can always be trapped with C<eval>).
-
-Code and a description of the error can be obtained by calling
-the methods L</last_errorcode> and L</last_error> respectively.
-
-You should always check for errors, when L</RaiseError> is not true.
-
-=cut
-sub RaiseError {
-    my ( $self ) = @_;
-
-    return $self->{RaiseError};
-}
 
 #-- public methods -------------------------------------------------------------
 
 #-- private attributes ---------------------------------------------------------
 
 #-- private methods ------------------------------------------------------------
-
-# process a request, handle responce
-sub _fulfill_request {
-    my ( $self, $request ) = @_;
-
-    my $connection = $self->{Connection};
-    my $response;
-    try {
-        $response = $connection->receive_response_to_request( $request );
-    };
-    unless ( $response ) {
-        $self->_connection_error;
-        return;
-    }
-
-    return $response;
-}
-
-# Handler for errors not tied with network communication
-# Dies if RaiseError set to true.
-sub _error {
-    my ( $self, $error_code, $description ) = @_;
-
-    $self->_set_error( $error_code, $ERROR{ $error_code }.( $description ? ': '.$description : q{} ) );
-
-    confess( $self->last_error )
-        if $self->last_errorcode == $ERROR_MISMATCH_ARGUMENT;
-
-    return unless $self->RaiseError;
-
-    if ( $self->last_errorcode == $ERROR_NO_ERROR ) { return; }
-    else                                            { die $self->last_error; }
-}
-
-#
-# Handles connection errors (Kafka::IO).
-# Dies if RaiseError set to true.
-sub _connection_error {
-    my ( $self ) = @_;
-
-    my $connection  = $self->{Connection};
-    my $errorcode   = $connection->last_errorcode;
-
-    return if $errorcode == $ERROR_NO_ERROR;
-
-    $self->_set_error( $errorcode, $connection->last_error );
-
-    return if !$self->RaiseError && !$connection->RaiseError;
-
-    if    ( $errorcode == $ERROR_MISMATCH_ARGUMENT )    { confess $self->last_error; }
-    else                                                { die $self->last_error; }
-}
-
-# Sets internal variable describing error
-sub _set_error {
-    my ( $self, $error_code, $description ) = @_;
-
-    no strict 'refs';   ## no critic
-    ${ ref( $self ).'::_package_error' } = dualvar $error_code, $description;
-}
-
-# Verifies that the argument is of type Math::BigInt
-sub _isbig {
-    my ( $num ) = @_;
-
-    return defined _INSTANCE( $num, 'Math::BigInt' );
-}
 
 1;
 
@@ -324,9 +191,11 @@ protocol on 32 bit systems.
 L<Kafka::Protocol|Kafka::Protocol> - functions to process messages in the
 Apache Kafka's Protocol.
 
-L<Kafka::IO|Kafka::IO> - low level interface for communication with Kafka server.
+L<Kafka::IO|Kafka::IO> - low-level interface for communication with Kafka server.
 
-L<Kafka::Internals|Kafka::Internals> - Internal constants and functions used
+L<Kafka::Exceptions|Kafka::Exceptions> - module designated to handle Kafka exceptions.
+
+L<Kafka::Internals|Kafka::Internals> - internal constants and functions used
 by several package modules.
 
 A wealth of detail about the Apache Kafka and the Kafka Protocol:
@@ -355,8 +224,7 @@ This package is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself. See I<perlartistic> at
 L<http://dev.perl.org/licenses/artistic.html>.
 
-This program is
-distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.
 

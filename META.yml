@@ -25,6 +25,7 @@ no_index:
     - inc
 requires:
   Const::Fast: 0.014
+  Exception::Class: 1.37
   List::MoreUtils: 0.33
   Params::Util: 1.07
   Scalar::Util::Numeric: 0.22
@@ -32,4 +33,4 @@ requires:
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
   perl: 5.010
-version: 0.800_3
+version: 0.800_4

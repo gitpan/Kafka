@@ -39,6 +39,7 @@
       "runtime" : {
          "requires" : {
             "Const::Fast" : "0.014",
+            "Exception::Class" : "1.37",
             "List::MoreUtils" : "0.33",
             "Params::Util" : "1.07",
             "Scalar::Util::Numeric" : "0.22",
@@ -50,5 +51,5 @@
       }
    },
    "release_status" : "testing",
-   "version" : "0.800_3"
+   "version" : "0.800_4"
 }
