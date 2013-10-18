@@ -5,11 +5,11 @@ package Kafka;
 
 =head1 NAME
 
-Kafka - Apache Kafka interface for Perl
+Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_4 .
+This documentation refers to C<Kafka> package version 0.800_5 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 use Exporter qw(
     import
@@ -401,8 +401,7 @@ Kafka message API is implemented by L<Kafka::Message|Kafka::Message> class.
         say 'key        : ', $message->key;
         say 'offset     : ', $message->offset;
         say 'next_offset: ', $message->next_offset;
-    }
-    else {
+    } else {
         say 'error      : ', $message->error;
     }
 
@@ -816,7 +815,7 @@ const our $ERROR_BROKER_NOT_AVAILABLE           => 8;
 
 9 - Replica not available
 
-RTFM: 'What is the difference between this and LeaderNotAvailable?'
+According to Apache Kafka documentation: 'What is the difference between this and LeaderNotAvailable?'
 
 =cut
 const our $ERROR_REPLICA_NOT_AVAILABLE          => 9;
@@ -835,7 +834,7 @@ const our $ERROR_MESSAGE_SIZE_TOO_LARGE         => 10;
 
 11 - Stale Controller Epoch Code
 
-RTFM: '???'
+According to Apache Kafka documentation: '???'
 
 =cut
 const our $ERROR_STALE_CONTROLLER_EPOCH_CODE    => 11;
@@ -1006,7 +1005,7 @@ __END__
         }
     };
 
-    # Closes the consumer and cleans up
+    # Closes and cleans up
     undef $consumer;
     undef $producer;
     undef $connection;

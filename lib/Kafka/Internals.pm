@@ -6,7 +6,7 @@ Kafka::Internals - Constants and functions used internally.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Internals> version 0.800_4 .
+This documentation refers to C<Kafka::Internals> version 0.800_5 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_4';
+our $VERSION = '0.800_5';
 
 use Exporter qw(
     import
@@ -129,8 +129,8 @@ const our $MAX_SOCKET_REQUEST_BYTES             => 100 * 1024 * 1024;
 
 =head3 C<$PRODUCER_ANY_OFFSET>
 
-RTFM: When the producer is sending messages it doesn't actually know the offset and can fill in any
-value here it likes.
+According to Apache Kafka documentation: 'When the producer is sending messages it doesn't actually know the offset and can fill in any
+value here it likes.'
 
 =cut
 const our $PRODUCER_ANY_OFFSET                  => 0;
