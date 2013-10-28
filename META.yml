@@ -33,4 +33,4 @@ requires:
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
   perl: 5.010
-version: 0.800_6
+version: 0.800_7

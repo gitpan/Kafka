@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.800_7 Mon Oct  28 2013
+    CHANGES:
+    - t/*_io.t test more ways how external alarm may interfere with internal
+      alarm used by Kafka::IO.
+    - Added to META.yml the list of the modules provided by this distribution.
+
 0.800_6 Fri Oct  25 2013
     CHANGES:
     - You can disable ALARMS usage by Kafka by passing timeout => undef to
