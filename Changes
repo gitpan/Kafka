@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.800_8 Tue Oct  29 2013
+    CHANGES:
+    - Debug output added to t/*_io.t .
+
 0.800_7 Mon Oct  28 2013
     CHANGES:
     - t/*_io.t test more ways how external alarm may interfere with internal

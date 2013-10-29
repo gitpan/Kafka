@@ -57,6 +57,8 @@ use Kafka::TestInternals qw(
 
 #-- setting up facilities ------------------------------------------------------
 
+$Kafka::IO::DEBUG = 2;
+
 #-- declarations ---------------------------------------------------------------
 
 my $server_code = sub {
@@ -168,7 +170,7 @@ eval {
 
         ok !$marker_signal_handling, 'signal handler is not triggered yet';
         # 'sleep' to be interrupted by an external signal
-        sleep $timer + 3;
+        sleep $timer + 4;
     };
     alarm 0;
 };

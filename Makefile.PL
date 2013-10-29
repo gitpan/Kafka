@@ -9,16 +9,18 @@ if ( $^O eq 'MSWin32' ) {
     exit( 255 );
 }
 
-use ExtUtils::MakeMaker qw( prompt );
+use ExtUtils::MakeMaker qw(
+    prompt
+);
 use File::Spec::Functions qw(
     catdir
 );
 
 my %config = (
-    NAME                        => 'Kafka',
-    VERSION_FROM                => 'lib/Kafka.pm',  # finds $VERSION
-    MIN_PERL_VERSION            => '5.010',
-    PREREQ_PM                   => {            # more to the list $Module::CoreList::version{5.010}
+    NAME                => 'Kafka',
+    VERSION_FROM        => 'lib/Kafka.pm',  # finds $VERSION
+    MIN_PERL_VERSION    => '5.010',
+    PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
         'Const::Fast'           => '0.014',
         'Exception::Class'      => 1.37,
         'List::MoreUtils'       => 0.33,
@@ -27,8 +29,8 @@ my %config = (
         'String::CRC32'         => '1.4',
         'Sys::SigAction'        => 0.15,
         'Try::Tiny'             => 0.18,
-        },
-    BUILD_REQUIRES              => {            # more to the list $Module::CoreList::version{5.010}
+    },
+    BUILD_REQUIRES      => {            # more to the list $Module::CoreList::version{5.010}
         'Capture::Tiny'         => 0.22,
         'Config::IniFiles'      => 2.82,
         'Proc::Daemon'          => 0.14,
@@ -36,17 +38,68 @@ my %config = (
         'Test::Deep'            => 0.109,
         'Test::Exception'       => 0.31,
         'Test::TCP'             => 2.00,
+    },
+    META_MERGE          => {
+        no_index                => {
+            directory               => [
+                "t",
+                "xt",
+                "tools"
+            ]
         },
+        provides                => {
+            "Kafka"                 => {
+                file                    => "lib/Kafka.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Connection"     => {
+                file                    => "lib/Kafka/Connection.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Consumer"       => {
+                file                    => "lib/Kafka/Consumer.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Exceptions"     => {
+                file                    => "lib/Kafka/Exceptions.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::IO"             => {
+                file                    => "lib/Kafka/IO.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Int64"          => {
+                file                    => "lib/Kafka/Int64.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Internals"      => {
+                file                    => "lib/Kafka/Internals.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Message"        => {
+                file                    => "lib/Kafka/Message.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Producer"       => {
+                file                    => "lib/Kafka/Producer.pm",
+                version                 => "0.800_8"
+            },
+            "Kafka::Protocol"       => {
+                file                    => "lib/Kafka/Protocol.pm",
+                version                 => "0.800_8"
+            },
+        },
+    },
     ( $] >= 5.005 ?                             ## Add these new keywords supported since 5.005
         (
-        ABSTRACT        => 'Apache Kafka low-level synchronous API, which does not use Zookeeper.',
-        AUTHOR          => 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
+            ABSTRACT            => 'Apache Kafka low-level synchronous API, which does not use Zookeeper.',
+            AUTHOR              => 'TrackingSoft LLC <sgladkov@trackingsoft.com>'
         ) : ()
     ),
-    dist        => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean       => { FILES => "Debian_CPANTS.txt Kafka-*.tar.gz" },
-    LICENSE     => 'perl',
-    NO_MYMETA   => 1,
+    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+    clean               => { FILES => "Debian_CPANTS.txt Kafka-*.tar.gz" },
+    LICENSE             => 'perl',
+#    NO_MYMETA           => 1,
 );
 
 my @patterns = qw( t/*.t );

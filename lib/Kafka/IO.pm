@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_7 .
+This documentation refers to C<Kafka::IO> version 0.800_8 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_7';
+our $VERSION = '0.800_8';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -213,7 +213,7 @@ sub send {
     ( my $len = length( $message ) ) <= $MAX_SOCKET_REQUEST_BYTES
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
-    $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG;
+    $self->_debug_msg( 'Request to', 'green', $message ) if $DEBUG == 1;
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
@@ -262,7 +262,7 @@ sub receive {
     ( defined( $from_recv ) && !$self->{not_accepted} )
         or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
-    $self->_debug_msg( 'Response from', 'yellow', $message ) if $DEBUG;
+    $self->_debug_msg( 'Response from', 'yellow', $message ) if $DEBUG == 1;
     return \$message;
 }
 
@@ -332,17 +332,25 @@ sub _connect {
             alarm 0;                                # race condition protection
             my $error = $@;
             undef $h;
+
+            say( STDERR "# _connect(): ip = '", defined( $ip ) ? inet_ntoa( $ip ) : '<undef>', "', error = '$error', \$? = $?, \$! = '$!'" ) if $DEBUG == 2;
+
             die $error if $error;
-            die( "gethostbyname $name: $?\n" ) unless defined $ip;
+            die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
 
             my $elapsed = time() - $start;
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
+
+            say( STDERR  "# _connect(): ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) ) if $DEBUG == 2;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
+                    say( STDERR "# _connect(): remaining - elapsed > 0" ) if $DEBUG == 2;
                     alarm( $remaining - $elapsed );
                 } else {
+                    say( STDERR "# _connect(): remaining - elapsed < 0" ) if $DEBUG == 2;
                     $SIG{ALRM}->();
                 }
+                say( STDERR "# _connect(): after 'alarm'" ) if $DEBUG == 2;
             }
         } else {
             $ip = gethostbyname( $name );
