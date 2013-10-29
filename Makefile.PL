@@ -42,51 +42,51 @@ my %config = (
     META_MERGE          => {
         no_index                => {
             directory               => [
-                "t",
-                "xt",
-                "tools"
+                't',
+                'xt',
+                'tools'
             ]
         },
         provides                => {
-            "Kafka"                 => {
-                file                    => "lib/Kafka.pm",
-                version                 => "0.800_8"
+            'Kafka'                 => {
+                file                    => 'lib/Kafka.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Connection"     => {
-                file                    => "lib/Kafka/Connection.pm",
-                version                 => "0.800_8"
+            'Kafka::Connection'     => {
+                file                    => 'lib/Kafka/Connection.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Consumer"       => {
-                file                    => "lib/Kafka/Consumer.pm",
-                version                 => "0.800_8"
+            'Kafka::Consumer'       => {
+                file                    => 'lib/Kafka/Consumer.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Exceptions"     => {
-                file                    => "lib/Kafka/Exceptions.pm",
-                version                 => "0.800_8"
+            'Kafka::Exceptions'     => {
+                file                    => 'lib/Kafka/Exceptions.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::IO"             => {
-                file                    => "lib/Kafka/IO.pm",
-                version                 => "0.800_8"
+            'Kafka::IO'             => {
+                file                    => 'lib/Kafka/IO.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Int64"          => {
-                file                    => "lib/Kafka/Int64.pm",
-                version                 => "0.800_8"
+            'Kafka::Int64'          => {
+                file                    => 'lib/Kafka/Int64.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Internals"      => {
-                file                    => "lib/Kafka/Internals.pm",
-                version                 => "0.800_8"
+            'Kafka::Internals'      => {
+                file                    => 'lib/Kafka/Internals.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Message"        => {
-                file                    => "lib/Kafka/Message.pm",
-                version                 => "0.800_8"
+            'Kafka::Message'        => {
+                file                    => 'lib/Kafka/Message.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Producer"       => {
-                file                    => "lib/Kafka/Producer.pm",
-                version                 => "0.800_8"
+            'Kafka::Producer'       => {
+                file                    => 'lib/Kafka/Producer.pm',
+                version                 => '0.800_9'
             },
-            "Kafka::Protocol"       => {
-                file                    => "lib/Kafka/Protocol.pm",
-                version                 => "0.800_8"
+            'Kafka::Protocol'       => {
+                file                    => 'lib/Kafka/Protocol.pm',
+                version                 => '0.800_9'
             },
         },
     },

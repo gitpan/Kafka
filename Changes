@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.800_8 Tue Oct  29 2013
+0.800_9 Tue Oct  29 2013
     CHANGES:
     - Debug output added to t/*_io.t .
 
