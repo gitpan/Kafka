@@ -23,40 +23,39 @@ no_index:
   directory:
     - t
     - inc
-    - t
     - xt
     - tools
 provides:
   Kafka:
     file: lib/Kafka.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Connection:
     file: lib/Kafka/Connection.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Consumer:
     file: lib/Kafka/Consumer.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Exceptions:
     file: lib/Kafka/Exceptions.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::IO:
     file: lib/Kafka/IO.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Int64:
     file: lib/Kafka/Int64.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Internals:
     file: lib/Kafka/Internals.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Message:
     file: lib/Kafka/Message.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Producer:
     file: lib/Kafka/Producer.pm
-    version: 0.800_9
+    version: 0.800_10
   Kafka::Protocol:
     file: lib/Kafka/Protocol.pm
-    version: 0.800_9
+    version: 0.800_10
 requires:
   Const::Fast: 0.014
   Exception::Class: 1.37
@@ -67,4 +66,4 @@ requires:
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
   perl: 5.010
-version: 0.800_9
+version: 0.800_10

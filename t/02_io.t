@@ -57,7 +57,9 @@ use Kafka::TestInternals qw(
 
 #-- setting up facilities ------------------------------------------------------
 
-$Kafka::IO::DEBUG = 2;
+use constant DEBUG  => 2;
+$Kafka::IO::DEBUG = DEBUG if DEBUG;
+STDOUT->autoflush;
 
 #-- declarations ---------------------------------------------------------------
 
@@ -82,7 +84,7 @@ my $server_code = sub {
     }
 };
 
-my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $sent, $resp, $test_message );
+my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message );
 
 #-- Global data ----------------------------------------------------------------
 
@@ -99,10 +101,15 @@ $test_message = "Test message\n";
 
 #-- ALRM handler
 
-$sig_handler = set_sig_handler( SIGALRM ,sub { ++$marker_signal_handling; } );
+$sig_handler = set_sig_handler( SIGALRM ,sub {
+        ++$marker_signal_handling;
+        say STDERR '# SIGALRM: signal handler triggered' if DEBUG;
+    }
+);
 ok( !defined( $marker_signal_handling ), 'marker signal handling not defined' );
 
 throws_ok {
+    diag "ALRM handler: host => 'something bad'" if DEBUG;
     $io = Kafka::IO->new(
         host    => 'something bad',
         port    => $port,
@@ -110,6 +117,7 @@ throws_ok {
     );
 } 'Kafka::Exception::IO', 'error thrown';
 
+diag "ALRM handler: host => 'localhost'" if DEBUG;
 $io = Kafka::IO->new(
     host    => 'localhost',
     port    => $port,
@@ -118,6 +126,7 @@ $io = Kafka::IO->new(
 isa_ok( $io, 'Kafka::IO' );
 
 ok( !defined( $marker_signal_handling ), 'marker signal handling not defined' );
+# signal handler triggered
 kill ALRM => $$;
 is $marker_signal_handling, 1, 'the signal handler to be reset to the previous value';
 
@@ -125,10 +134,14 @@ is $marker_signal_handling, 1, 'the signal handler to be reset to the previous v
 
 # Kafka::IO->new is badly ended before 'timer' and before 'timeout'
 
+# cancel the previous timer
 alarm 0;
 $SIG{ALRM} = sub { ++$marker_signal_handling; };
-$timer = $REQUEST_TIMEOUT;
+$timer      = $REQUEST_TIMEOUT;
+$timeout    = $timer;
 
+diag "Kafka::IO->new is badly ended before 'timer' and before 'timeout'" if DEBUG;
+diag "timer = $timer, timeout = $timeout, host => 'something bad'" if DEBUG;
 $marker_signal_handling = 0;
 eval {
     alarm $timer;
@@ -136,7 +149,7 @@ eval {
         $io = Kafka::IO->new(
             host    => 'something bad',
             port    => $port,
-            timeout => $timer,
+            timeout => $timeout,
         );
     };
     alarm 0;
@@ -145,19 +158,27 @@ ok !$marker_signal_handling, 'signal handler is not triggered';
 
 # Kafka::IO->new is correctly ended before 'timer' and before 'timeout'
 
+# cancel the previous timer
 alarm 0;
-$SIG{ALRM} = sub { ++$marker_signal_handling; };
-$timer = $REQUEST_TIMEOUT + 2;
+$SIG{ALRM} = sub {
+    ++$marker_signal_handling;
+    say STDERR '# SIGALRM: signal handler triggered' if DEBUG;
+};
+$timer      = $REQUEST_TIMEOUT + 3;
+$timeout    = $timer + 3;
 
 $original = \&Kafka::IO::_gethostbyname;
 Sub::Install::reinstall_sub( {
     code    => sub {
+        say STDERR '# _gethostbyname called (without sleep)' if DEBUG;
         return inet_aton( 'localhost' );
     },
     into    => 'Kafka::IO',
     as      => '_gethostbyname',
 } );
 
+diag "Kafka::IO->new is correctly ended before 'timer' and before 'timeout'" if DEBUG;
+diag "timer = $timer, timeout = $timeout, host => 'something bad'" if DEBUG;
 $marker_signal_handling = 0;
 eval {
     alarm $timer;
@@ -165,12 +186,12 @@ eval {
         $io = Kafka::IO->new(
             host    => 'something bad',
             port    => $port,
-            timeout => $timer + 2,
+            timeout => $timeout,
         );
 
         ok !$marker_signal_handling, 'signal handler is not triggered yet';
         # 'sleep' to be interrupted by an external signal
-        sleep $timer + 4;
+        sleep $timeout * 2;
     };
     alarm 0;
 };
@@ -184,20 +205,28 @@ Sub::Install::reinstall_sub( {
 
 # Kafka::IO->new is correctly ended after 'timer' and before 'timeout'
 
+# cancel the previous timer
+alarm 0;
+$SIG{ALRM} = sub {
+    ++$marker_signal_handling;
+    say STDERR '# SIGALRM: signal handler triggered' if DEBUG;
+};
+$timer      = $REQUEST_TIMEOUT + 1;
+$timeout    = $timer + 6;
+
 Sub::Install::reinstall_sub( {
     code    => sub {
+        say STDERR '# _gethostbyname called (sleep ', $timer + 3, ')' if DEBUG;
         # 'sleep' should not be interrupted by an external signal
-        sleep $timer + 2;
+        sleep $timer + 3;
         return inet_aton( 'localhost' );
     },
     into    => 'Kafka::IO',
     as      => '_gethostbyname',
 } );
 
-alarm 0;
-$SIG{ALRM} = sub { ++$marker_signal_handling; };
-$timer = $REQUEST_TIMEOUT;
-
+diag "Kafka::IO->new is correctly ended after 'timer' and before 'timeout'" if DEBUG;
+diag "timer = $timer, timeout = $timeout, host => 'localhost'" if DEBUG;
 $marker_signal_handling = 0;
 eval {
     alarm $timer;
@@ -205,7 +234,7 @@ eval {
         $io = Kafka::IO->new(
             host    => 'localhost',
             port    => $port,
-            timeout => $timer + 4,
+            timeout => $timeout,
         );
     };
     alarm 0;
@@ -217,6 +246,8 @@ Sub::Install::reinstall_sub( {
     into    => 'Kafka::IO',
     as      => '_gethostbyname',
 } );
+
+diag "external 'alarm' tested" if DEBUG;
 
 #-- is_alive
 
