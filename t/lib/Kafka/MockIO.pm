@@ -7,7 +7,7 @@ the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::MockIO> version 0.800_11 .
+This documentation refers to C<Kafka::MockIO> version 0.800_12 .
 
 =cut
 
@@ -19,7 +19,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_11';
+our $VERSION = '0.800_12';
 
 #-- load the modules -----------------------------------------------------------
 
