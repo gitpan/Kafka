@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_10 .
+This documentation refers to C<Kafka::IO> version 0.800_11 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_10';
+our $VERSION = '0.800_11';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -333,7 +333,7 @@ sub _connect {
             my $error = $@;
             undef $h;
 
-            say( STDERR "# _connect: ip = '", defined( $ip ) ? inet_ntoa( $ip ) : '<undef>', "', error = '$error', \$? = $?, \$! = '$!'" ) if $DEBUG == 2;
+            say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: ip = '", defined( $ip ) ? inet_ntoa( $ip ) : '<undef>', "', error = '$error', \$? = $?, \$! = '$!'" ) if $DEBUG == 2;
 
             die $error if $error;
             die( "gethostbyname $name: \$? = '$?', \$! = '$!'\n" ) unless defined $ip;
@@ -341,17 +341,17 @@ sub _connect {
             my $elapsed = time() - $start;
             # $SIG{ALRM} restored automatically, but we need to restart previous alarm manually
 
-            say( STDERR  "# _connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) ) if $DEBUG == 2;
+            say( STDERR  '# [ time = ', Time::HiRes::time(), " ] _connect: ".( $remaining // '<undef>' )." (remaining) - $elapsed (elapsed) = ".( $remaining - $elapsed ) ) if $DEBUG == 2;
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
-                    say( STDERR "# _connect: remaining - elapsed > 0 (to alarm restart)" ) if $DEBUG == 2;
+                    say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: remaining - elapsed > 0 (to alarm restart)" ) if $DEBUG == 2;
                     alarm( $remaining - $elapsed );
                 } else {
-                    say( STDERR "# _connect: remaining - elapsed < 0 (to alarm function call)" ) if $DEBUG == 2;
+                    say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: remaining - elapsed < 0 (to alarm function call)" ) if $DEBUG == 2;
                     # $SIG{ALRM}->();
                     kill ALRM => $$;
                 }
-                say( STDERR "# _connect: after alarm 'recalled'" ) if $DEBUG == 2;
+                say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: after alarm 'recalled'" ) if $DEBUG == 2;
             }
         } else {
             $ip = gethostbyname( $name );

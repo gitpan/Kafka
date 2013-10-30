@@ -9,7 +9,7 @@ Kafka - Apache Kafka interface for Perl.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka> package version 0.800_10 .
+This documentation refers to C<Kafka> package version 0.800_11 .
 
 =cut
 
@@ -21,7 +21,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_10';
+our $VERSION = '0.800_11';
 
 use Exporter qw(
     import

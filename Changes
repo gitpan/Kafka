@@ -1,6 +1,6 @@
 Revision history for Kafka package
 
-0.800_8 - 0.800_10 Tue Oct  29 2013
+0.800_8 - 0.800_11 Tue Oct  29 2013
     CHANGES:
     - Debugging Test t/*_io.t .
 
