@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_12 .
+This documentation refers to C<Kafka::IO> version 0.800_13 .
 
 =cut
 
@@ -20,13 +20,16 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_12';
+our $VERSION = '0.800_13';
 
 #-- load the modules -----------------------------------------------------------
 
 use Carp;
 use Errno;
 use Fcntl;
+use POSIX qw(
+    ceil
+);
 use Scalar::Util qw(
     dualvar
 );
@@ -34,9 +37,6 @@ use Socket;
 use Sys::SigAction qw(
     set_sig_handler
 );
-#use Time::HiRes qw(
-#    alarm
-#);
 use Try::Tiny;
 
 use Kafka qw(
@@ -325,7 +325,7 @@ sub _connect {
                 }
             );
             eval {
-                $remaining = alarm $timeout;
+                $remaining = alarm( ceil( $timeout ) );
                 $ip = $self->_gethostbyname( $name );
                 alarm 0;
             };
@@ -345,7 +345,7 @@ sub _connect {
             if ( $remaining ) {
                 if ( $remaining - $elapsed > 0 ) {
                     say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: remaining - elapsed > 0 (to alarm restart)" ) if $DEBUG == 2;
-                    alarm( $remaining - $elapsed );
+                    alarm( ceil( $remaining - $elapsed ) );
                 } else {
                     say( STDERR '# [ time = ', Time::HiRes::time(), " ] _connect: remaining - elapsed < 0 (to alarm function call)" ) if $DEBUG == 2;
                     # $SIG{ALRM}->();

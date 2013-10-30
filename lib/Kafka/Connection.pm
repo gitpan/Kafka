@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_12 .
+This documentation refers to C<Kafka::Connection> version 0.800_13 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_12';
+our $VERSION = '0.800_13';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -43,9 +43,9 @@ use Scalar::Util::Numeric qw(
     isint
 );
 use Sys::Hostname;
-#use Time::HiRes qw(
-#    sleep
-#);
+use Time::HiRes qw(
+    sleep
+);
 use Try::Tiny;
 
 use Kafka qw(

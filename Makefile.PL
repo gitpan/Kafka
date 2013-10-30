@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use 5.010;
 
-if ( $^O eq 'MSWin32' ) {
+if ( $^O eq 'MSWin32' || $^O eq 'solaris' ) {
     print STDERR "OS unsupported: $^O\n";
     exit( 255 );
 }
@@ -51,43 +51,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '0.800_12'
+                version                 => '0.800_13'
             },
         },
     },
