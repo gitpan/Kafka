@@ -1,5 +1,11 @@
 Revision history for Kafka package
 
+0.800_14 Thu Oct  31 2013
+    CHANGES:
+    - We use alarm internally in Kafka::IO (not Time::HiRes::ualarm).
+    - For 'gethostbyname' operations the timeout is rounded
+      to the nearest greater positive integer.
+
 0.800_8 - 0.800_13 Wed Oct  30 2013
     CHANGES:
     - Debugging Test t/*_io.t .

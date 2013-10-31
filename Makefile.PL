@@ -22,6 +22,7 @@ my %config = (
     MIN_PERL_VERSION    => '5.010',
     PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
         'Const::Fast'           => '0.014',
+        'Data::HexDump::Range'  => 0.13,
         'Exception::Class'      => 1.37,
         'List::MoreUtils'       => 0.33,
         'Params::Util'          => 1.07,
@@ -51,43 +52,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '0.800_13'
+                version                 => '0.800_14'
             },
         },
     },
@@ -117,5 +118,6 @@ if( $ENV{RELEASE_TESTS} ) {
 }
 
 mkdir 't/data' unless -d 't/data';
+mkdir 'inc' unless -d 'inc';
 
 ExtUtils::MakeMaker::WriteMakefile( %config );
