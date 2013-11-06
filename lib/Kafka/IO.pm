@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_14 .
+This documentation refers to C<Kafka::IO> version 0.800_15 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_14';
+our $VERSION = '0.800_15';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -33,7 +33,17 @@ use POSIX qw(
 use Scalar::Util qw(
     dualvar
 );
-use Socket;
+use Socket qw(
+    PF_INET
+    SOCK_STREAM
+    SOL_SOCKET
+    SO_ERROR
+    SO_RCVTIMEO
+    SO_SNDTIMEO
+    inet_aton
+    inet_ntoa
+    pack_sockaddr_in
+);
 use Sys::SigAction qw(
     set_sig_handler
 );

@@ -39,7 +39,9 @@ plan 'no_plan';
 
 use IO::Socket::INET;
 use POSIX ':signal_h';
-use Socket;
+use Socket qw(
+    inet_aton
+);
 use Sub::Install;
 use Sys::SigAction qw(
     set_sig_handler
@@ -94,7 +96,7 @@ sub debug_msg {
     diag '[ time = ', Time::HiRes::time(), ' ] ', $message;
 }
 
-my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message );
+my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message, $inet_aton );
 
 #-- Global data ----------------------------------------------------------------
 
@@ -104,6 +106,7 @@ ok $port, "server port = $port";
 wait_port( $port );
 
 $test_message = "Test message\n";
+$inet_aton = inet_aton( 'localhost' );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
@@ -186,7 +189,7 @@ $original = \&Kafka::IO::_gethostbyname;
 Sub::Install::reinstall_sub( {
     code    => sub {
         debug_msg( '_gethostbyname called (without sleep)' );
-        return inet_aton( 'localhost' );
+        return $inet_aton;
     },
     into    => 'Kafka::IO',
     as      => '_gethostbyname',
@@ -234,7 +237,7 @@ Sub::Install::reinstall_sub( {
         debug_msg( '_gethostbyname called (sleep ', $timer + 5, ')' );
         # 'sleep' should not be interrupted by an external signal
         sleep $timer + 5;
-        return inet_aton( 'localhost' );
+        return $inet_aton;
     },
     into    => 'Kafka::IO',
     as      => '_gethostbyname',
