@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.800_15 .
+This documentation refers to C<Kafka::IO> version 0.800_16 .
 
 =cut
 
@@ -20,7 +20,7 @@ use sigtrap;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_15';
+our $VERSION = '0.800_16';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -380,7 +380,7 @@ sub _connect {
     }
 
     # Create socket.
-    socket( my $connection, PF_INET, SOCK_STREAM, getprotobyname( "tcp" ) ) or die( "socket: $!\n" );
+    socket( my $connection, PF_INET, SOCK_STREAM, getprotobyname( 'tcp' ) ) or die( "socket: $!\n" );
 
     # Set autoflushing.
     $_ = select( $connection ); $| = 1; select $_;
@@ -409,7 +409,7 @@ sub _connect {
     unless( vec( $vec, fileno( $connection ), 1 ) ) {
         # If no response yet, impose our own timeout.
         $! = Errno::ETIMEDOUT();
-        die("connect ${ip}:${port} (${name}): $!\n");
+        die( "connect ${ip}:${port} (${name}): $!\n" );
     }
 
     # This is how we see whether it connected or there was an error. Document Unix, are you kidding?!
