@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_16 .
+This documentation refers to C<Kafka::Connection> version 0.800_17 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_16';
+our $VERSION = '0.800_17';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -263,20 +263,43 @@ Since leader election takes a bit of time, this property specifies the amount of
 in milliseconds, that the producer waits before refreshing the metadata.
 The C<$backoff> should be an integer number.
 
+=item C<AutoCreateTopicsEnable =E<gt> $mode>
+
+Optional, default value is 0 (false).
+
+I<AutoCreateTopicsEnable> controls how this module handles the first access to non-existent topic
+when C<auto.create.topics.enable> in server configuration is C<true>.
+If I<AutoCreateTopicsEnable> is false (default),
+the first access to non-existent topic produces an exception;
+however, the topic is created and next attempts to access it will succeed.
+
+If I<AutoCreateTopicsEnable> is true, this module waits
+(according to the C<SEND_MAX_RETRIES> and C<RETRY_BACKOFF> properties)
+until the topic is created,
+to avoid errors on the first access to non-existent topic.
+
+If C<auto.create.topics.enable> in server configuration is C<false>, this setting has no effect.
+
 =back
 
 =cut
 sub new {
     my ( $class, @args ) = @_;
 
+# WARNING:
+# Make sure that you always connect to brokers using EXACTLY the same address or host name
+# as specified in broker configuration (host.name in server.properties).
+# Avoid using default value (when host.name is commented out) in server.properties - always use explicit value instead.
+
     my $self = bless {
-        host                => q{},
-        port                => $KAFKA_SERVER_PORT,
-        broker_list         => [],
-        timeout             => $REQUEST_TIMEOUT,
-        CorrelationId       => undef,
-        SEND_MAX_RETRIES    => $SEND_MAX_RETRIES,
-        RETRY_BACKOFF       => $RETRY_BACKOFF,
+        host                    => q{},
+        port                    => $KAFKA_SERVER_PORT,
+        broker_list             => [],
+        timeout                 => $REQUEST_TIMEOUT,
+        CorrelationId           => undef,
+        SEND_MAX_RETRIES        => $SEND_MAX_RETRIES,
+        RETRY_BACKOFF           => $RETRY_BACKOFF,
+        AutoCreateTopicsEnable  => 0,
     }, $class;
 
     while ( @args ) {
@@ -443,7 +466,7 @@ sub receive_response_to_request {
 
     unless ( %{ $self->{_metadata} } ) {    # the first request
         $self->_update_metadata( $topic_name )  # hash metadata could be updated
-            or $self->_error( $ERROR_CANNOT_GET_METADATA );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
 
@@ -504,7 +527,7 @@ sub receive_response_to_request {
 
         sleep $self->{RETRY_BACKOFF} / 1000;
         $self->_update_metadata( $topic_name )
-            or $self->_error( $ERROR_CANNOT_GET_METADATA );
+            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
 
     # NOTE: it is possible to repeat the operation here
@@ -612,7 +635,7 @@ sub _get_interviewed_servers {
 
 # Refresh metadata for given topic
 sub _update_metadata {
-    my ( $self, $topic ) = @_;
+    my ( $self, $topic, $is_recursive_call ) = @_;
 
     my $CorrelationId = $self->{CorrelationId};
     my $encoded_request = $protocol{ $APIKEY_METADATA }->{encode}->( {
@@ -642,8 +665,19 @@ sub _update_metadata {
     $decoded_response->{CorrelationId} == $CorrelationId
         or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
-    _ARRAY( $decoded_response->{Broker} )
-        or $self->_error( $ERROR_NO_KNOWN_BROKERS );
+    unless ( _ARRAY( $decoded_response->{Broker} ) ) {
+        if ( $self->{AutoCreateTopicsEnable} ) {
+            return if $is_recursive_call;
+
+            my $retries = $self->{SEND_MAX_RETRIES};
+            ATTEMPTS:
+            while ( $retries-- ) {
+                sleep $self->{RETRY_BACKOFF} / 1000;
+                return( 1 ) if $self->_update_metadata( $topic, 1 );
+            }
+        }
+        $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = $topic" );
+    }
 
     my $IO_cache = $self->{_IO_cache};
 
@@ -689,7 +723,7 @@ sub _update_metadata {
     }
 
     %$received_metadata
-        or $self->_error( $ERROR_CANNOT_GET_METADATA );
+        or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
 
     # Replace the information in the metadata
     $self->{_metadata}  = $received_metadata;
