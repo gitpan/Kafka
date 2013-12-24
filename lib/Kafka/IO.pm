@@ -6,7 +6,7 @@ Kafka::IO - Interface to network communication with the Apache Kafka server.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::IO> version 0.8001 .
+This documentation refers to C<Kafka::IO> version 0.8001_1 .
 
 =cut
 
@@ -22,7 +22,7 @@ use sigtrap;
 
 our $DEBUG = 0;
 
-our $VERSION = '0.8001';
+our $VERSION = '0.8001_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -226,7 +226,7 @@ sub send {
         or $self->_error( $ERROR_MISMATCH_ARGUMENT, '->send' );
 
     $self->_debug_msg( $message, 'Request to', 'green' )
-        if $self->debug_level;
+        if $self->debug_level == 1;
 
     # accept not accepted earlier
     while ( select( my $mask = $self->{_select}, undef, undef, 0 ) ) {
@@ -276,7 +276,7 @@ sub receive {
         or $self->_error( $ERROR_CANNOT_RECV, "->receive - $!" );
 
     $self->_debug_msg( $message, 'Response from', 'yellow' )
-        if $self->debug_level;
+        if $self->debug_level == 1;
     return \$message;
 }
 
@@ -329,6 +329,9 @@ sub _connect {
         if ( defined $timeout ) {
             my $remaining;
             my $start = time();
+
+            $self->_debug_msg( 'number of wallclock seconds = '.ceil( $timeout ) )
+                if $self->debug_level >= 2;
 
             # DNS lookup.
             local $@;
@@ -448,7 +451,7 @@ sub _gethostbyname {
 sub _debug_msg {
     my ( $self, $message, $header, $colour ) = @_;
 
-    if ( $self->debug_level ) {
+    if ( $self->debug_level == 1 ) {
         unless ( $_hdr ) {
             require Data::HexDump::Range;
             $_hdr = Data::HexDump::Range->new(

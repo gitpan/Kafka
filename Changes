@@ -1,5 +1,8 @@
 Revision history for Kafka package
 
+0.8001_1 Wed Dec  25 2013
+    CHANGES:    - Debugging Test t/*_io.t .
+
 0.8001 Tue Dec  24 2013
     CHANGES:
     - Improvements to error handling and tests.

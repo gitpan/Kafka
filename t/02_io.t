@@ -61,9 +61,9 @@ use Kafka::TestInternals qw(
 #-- setting up facilities ------------------------------------------------------
 
 # See Kafka::IO
-use constant DEBUG  => 0;
+#use constant DEBUG  => 0;
 #use constant DEBUG  => 1;
-#use constant DEBUG  => 2;
+use constant DEBUG  => 2;
 
 Kafka::IO->debug_level( DEBUG ) if DEBUG;
 
