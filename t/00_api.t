@@ -123,6 +123,7 @@ BEGIN {
         $ERROR_MESSAGE_SIZE_TOO_LARGE
         $ERROR_MISMATCH_ARGUMENT
         $ERROR_MISMATCH_CORRELATIONID
+        $ERROR_SEND_NO_ACK
         $ERROR_NO_ERROR
         $ERROR_NO_KNOWN_BROKERS
         $ERROR_NOT_BINARY_STRING
@@ -133,6 +134,7 @@ BEGIN {
         $ERROR_REPLICA_NOT_AVAILABLE
         $ERROR_REQUEST_OR_RESPONSE
         $ERROR_REQUEST_TIMED_OUT
+        $ERROR_SEND_NO_ACK
         $ERROR_STALE_CONTROLLER_EPOCH_CODE
         $ERROR_TOPIC_DOES_NOT_MATCH
         $ERROR_UNKNOWN
@@ -144,6 +146,7 @@ BEGIN {
         $NOT_SEND_ANY_RESPONSE
         $RECEIVE_EARLIEST_OFFSETS
         $RECEIVE_LATEST_OFFSET
+        $RECEIVE_MAX_RETRIES
         $REQUEST_TIMEOUT
         $RETRY_BACKOFF
         $SEND_MAX_RETRIES
@@ -167,6 +170,9 @@ BEGIN {
         $APIKEY_FETCH
         $APIKEY_OFFSET
         $APIKEY_METADATA
+        $MAX_CORRELATIONID
+        $MAX_INT16
+        $MAX_INT32
         $MAX_SOCKET_REQUEST_BYTES
         $PRODUCER_ANY_OFFSET
     ) ];
@@ -320,15 +326,21 @@ BEGIN {
 
 BEGIN {
     $ours_Kafka_Connection = [ qw (
+        DEBUG
+        RETRY_ON_ERRORS
     ) ];
 
     $methods_Kafka_Connection = [ qw(
+        clear_nonfatals
         close
         close_connection
+        cluster_errors
+        debug_level
         get_known_servers
         is_server_alive
         is_server_known
         new
+        nonfatal_errors
         receive_response_to_request
     ) ];
 

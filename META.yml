@@ -14,7 +14,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.8, CPAN::Meta::Converter version 2.132830'
+generated_by: 'ExtUtils::MakeMaker version 6.82, CPAN::Meta::Converter version 2.132830'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -29,34 +29,34 @@ no_index:
 provides:
   Kafka:
     file: lib/Kafka.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Connection:
     file: lib/Kafka/Connection.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Consumer:
     file: lib/Kafka/Consumer.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Exceptions:
     file: lib/Kafka/Exceptions.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::IO:
     file: lib/Kafka/IO.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Int64:
     file: lib/Kafka/Int64.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Internals:
     file: lib/Kafka/Internals.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Message:
     file: lib/Kafka/Message.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Producer:
     file: lib/Kafka/Producer.pm
-    version: 0.800_17
+    version: 0.8001
   Kafka::Protocol:
     file: lib/Kafka/Protocol.pm
-    version: 0.800_17
+    version: 0.8001
 requires:
   Const::Fast: 0.014
   Data::HexDump::Range: 0.13
@@ -68,4 +68,4 @@ requires:
   Sys::SigAction: 0.15
   Try::Tiny: 0.18
   perl: 5.010
-version: 0.800_17
+version: 0.8001

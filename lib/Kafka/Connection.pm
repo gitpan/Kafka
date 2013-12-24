@@ -6,7 +6,7 @@ Kafka::Connection - Object interface to connect to a kafka cluster.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Connection> version 0.800_17 .
+This documentation refers to C<Kafka::Connection> version 0.8001 .
 
 =cut
 
@@ -18,7 +18,16 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.800_17';
+our $DEBUG = 0;
+
+our $VERSION = '0.8001';
+
+use Exporter qw(
+    import
+);
+our @EXPORT = qw(
+    %RETRY_ON_ERRORS
+);
 
 #-- load the modules -----------------------------------------------------------
 
@@ -39,6 +48,9 @@ use Params::Util qw(
     _POSINT
     _STRING
 );
+use Scalar::Util qw(
+    blessed
+);
 use Scalar::Util::Numeric qw(
     isint
 );
@@ -49,16 +61,35 @@ use Try::Tiny;
 
 use Kafka qw(
     %ERROR
+
+    $ERROR_NO_ERROR
+    $ERROR_UNKNOWN
+    $ERROR_OFFSET_OUT_OF_RANGE
+    $ERROR_INVALID_MESSAGE
+    $ERROR_UNKNOWN_TOPIC_OR_PARTITION
+    $ERROR_INVALID_MESSAGE_SIZE
+    $ERROR_LEADER_NOT_AVAILABLE
+    $ERROR_NOT_LEADER_FOR_PARTITION
+    $ERROR_REQUEST_TIMED_OUT
+    $ERROR_BROKER_NOT_AVAILABLE
+    $ERROR_REPLICA_NOT_AVAILABLE
+    $ERROR_MESSAGE_SIZE_TOO_LARGE
+    $ERROR_STALE_CONTROLLER_EPOCH_CODE
+    $ERROR_OFFSET_METADATA_TOO_LARGE_CODE
+
+    $ERROR_CANNOT_BIND
     $ERROR_CANNOT_GET_METADATA
+    $ERROR_CANNOT_RECV
+    $ERROR_CANNOT_SEND
     $ERROR_LEADER_NOT_FOUND
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_MISMATCH_CORRELATIONID
-    $ERROR_NO_ERROR
     $ERROR_NO_KNOWN_BROKERS
+    $ERROR_SEND_NO_ACK
     $ERROR_UNKNOWN_APIKEY
-    $ERROR_UNKNOWN_TOPIC_OR_PARTITION
     $KAFKA_SERVER_PORT
     $NOT_SEND_ANY_RESPONSE
+    $RECEIVE_MAX_RETRIES
     $REQUEST_TIMEOUT
     $RETRY_BACKOFF
     $SEND_MAX_RETRIES
@@ -69,6 +100,9 @@ use Kafka::Internals qw(
     $APIKEY_METADATA
     $APIKEY_OFFSET
     $APIKEY_PRODUCE
+    $MAX_CORRELATIONID
+    $MAX_INT32
+    debug_level
     _get_CorrelationId
 );
 use Kafka::IO;
@@ -164,6 +198,36 @@ my %known_api_keys = map { $_ => 1 } (
     $APIKEY_PRODUCE,
 );
 
+=head2 EXPORT
+
+The following constants are available for export
+
+=cut
+
+=head3 C<%RETRY_ON_ERRORS>
+
+These are non-fatal errors, which when happen causes refreshing of meta-data from Kafka followed by
+another attempt to fetch data.
+
+=cut
+# When any of the following error happens, a possible change in meta-data on server is expected.
+const our %RETRY_ON_ERRORS => (
+#   $ERROR_NO_ERROR                         => 1,   # 0 - No error
+    $ERROR_UNKNOWN                          => 1,   # -1 - An unexpected server error
+#   $ERROR_OFFSET_OUT_OF_RANGE              => 1,   # 1 - The requested offset is outside the range of offsets available at the server for the given topic/partition
+#   $ERROR_INVALID_MESSAGE                  => 1,   # 2 - Message contents does not match its control sum
+#   $ERROR_UNKNOWN_TOPIC_OR_PARTITION       => 1,   # 3 - Unknown topic or partition
+#   $ERROR_INVALID_MESSAGE_SIZE             => 1,   # 4 - Message has invalid size
+    $ERROR_LEADER_NOT_AVAILABLE             => 1,   # 5 - Unable to write due to ongoing Kafka leader selection
+    $ERROR_NOT_LEADER_FOR_PARTITION         => 1,   # 6 - Server is not a leader for partition
+    $ERROR_REQUEST_TIMED_OUT                => 1,   # 7 - Request time-out
+    $ERROR_BROKER_NOT_AVAILABLE             => 1,   # 8 - Broker is not available
+    $ERROR_REPLICA_NOT_AVAILABLE            => 1,   # 9 - Replica not available
+#   $ERROR_MESSAGE_SIZE_TOO_LARGE           => 1,   # 10 - Message is too big
+    $ERROR_STALE_CONTROLLER_EPOCH_CODE      => 1,   # 11 - Stale Controller Epoch Code
+#   $ERROR_OFFSET_METADATA_TOO_LARGE_CODE   => 1,   # 12 - Specified metadata offset is too big
+);
+
 #-- constructor ----------------------------------------------------------------
 
 =head2 CONSTRUCTOR
@@ -203,13 +267,10 @@ or C<broker_list> must be supplied.
 
 =item C<timeout =E<gt> $timeout>
 
-Optional, default = C<$REQUEST_TIMEOUT>.
+Optional, default = C<$Kafka::REQUEST_TIMEOUT>.
 
 C<$timeout> specifies how long we wait for the remote server to respond.
-C<$timeout> is in seconds, could be a positive integer or a floating-point number.
-
-C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
-L<Kafka|Kafka> module.
+C<$timeout> is in seconds, could be a positive integer or a floating-point number not bigger than int32 positive integer.
 
 Special behavior when C<timeout> is set to C<undef>:
 
@@ -243,21 +304,24 @@ If C<CorrelationId> is not provided, it is set to a random negative integer.
 
 =item C<SEND_MAX_RETRIES =E<gt> $retries>
 
-Optional, default = C<$SEND_MAX_RETRIES> .
+Optional, int32 signed integer, default = C<$Kafka::SEND_MAX_RETRIES> .
 
-C<$SEND_MAX_RETRIES> is the default number of retries that can be imported from the
-L<Kafka|Kafka> module and = 3 .
+In some circumstances (leader is temporarily unavailable, outdated metadata, etc) we may fail to send a message.
+This property specifies the maximum number of attempts to send a message.
+The C<$retries> should be an integer number.
 
-The leader may be unavailable transiently, which can fail the sending of a message.
-This property specifies the number of retries when such failures occur.
+=item C<RECEIVE_MAX_RETRIES =E<gt> $retries>
+
+Optional, int32 signed integer, default = C<$Kafka::RECEIVE_MAX_RETRIES> .
+
+In some circumstances (temporarily network issues, server high load, socket error, etc) we may fail to
+receive a response.
+This property specifies the maximum number of attempts to receive a message.
 The C<$retries> should be an integer number.
 
 =item C<RETRY_BACKOFF =E<gt> $backoff>
 
-Optional, default = C<$RETRY_BACKOFF> .
-
-C<$RETRY_BACKOFF> is the default timeout that can be imported from the
-L<Kafka|Kafka> module and = 100 ms.
+Optional, default = C<$Kafka::RETRY_BACKOFF> .
 
 Since leader election takes a bit of time, this property specifies the amount of time,
 in milliseconds, that the producer waits before refreshing the metadata.
@@ -280,6 +344,13 @@ to avoid errors on the first access to non-existent topic.
 
 If C<auto.create.topics.enable> in server configuration is C<false>, this setting has no effect.
 
+=item C<MaxLoggedErrors =E<gt> $number>
+
+Optional, default value is 100.
+
+Defines maximum number of last non-fatal errors that we keep in log. Use method L</nonfatal_errors> to
+access those errors.
+
 =back
 
 =cut
@@ -298,8 +369,10 @@ sub new {
         timeout                 => $REQUEST_TIMEOUT,
         CorrelationId           => undef,
         SEND_MAX_RETRIES        => $SEND_MAX_RETRIES,
+        RECEIVE_MAX_RETRIES     => $RECEIVE_MAX_RETRIES,
         RETRY_BACKOFF           => $RETRY_BACKOFF,
         AutoCreateTopicsEnable  => 0,
+        MaxLoggedErrors         => 100,
     }, $class;
 
     while ( @args ) {
@@ -313,16 +386,20 @@ sub new {
         unless defined( $self->{host} ) && ( $self->{host} eq q{} || defined( _STRING( $self->{host} ) ) ) && !utf8::is_utf8( $self->{host} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'port' )
         unless _POSINT( $self->{port} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout' )
-        unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 ) || !defined( $self->{timeout} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'timeout ('.( $self->{timeout} // '<undef>' ).')' )
+        unless ( _NUMBER( $self->{timeout} ) && $self->{timeout} > 0 && $self->{timeout} <= $MAX_INT32 ) || !defined( $self->{timeout} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'broker_list' )
         unless _ARRAY0( $self->{broker_list} );
-    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId' )
-        unless isint( $self->{CorrelationId} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'CorrelationId ('.( $self->{CorrelationId} // '<undef>' ).')' )
+        unless isint( $self->{CorrelationId} ) && $self->{CorrelationId} <= $MAX_CORRELATIONID;
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'SEND_MAX_RETRIES' )
         unless _POSINT( $self->{SEND_MAX_RETRIES} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RECEIVE_MAX_RETRIES' )
+        unless _POSINT( $self->{RECEIVE_MAX_RETRIES} );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, 'RETRY_BACKOFF' )
         unless _POSINT( $self->{RETRY_BACKOFF} );
+    $self->_error( $ERROR_MISMATCH_ARGUMENT, 'MaxLoggedErrors' )
+        unless defined( _NONNEGINT( $self->{MaxLoggedErrors} ) );
 
     $self->{_metadata} = {};                # {
                                             #   TopicName => {
@@ -343,6 +420,7 @@ sub new {
                                             #   NodeId  => host:port,
                                             #   ...,
                                             # }
+    $self->{_nonfatal_errors} = [];
     my $IO_cache = $self->{_IO_cache} = {}; # host:port => {
                                             #       'NodeId'    => ...,
                                             #       'IO'        => ...,
@@ -457,8 +535,7 @@ sub receive_response_to_request {
     my $api_key = $request->{ApiKey};
 
 # WARNING: The current version of the module limited to the following:
-# No clear answer to the question, one leader for any combination of topic + partition, or at the same time, there are several different leaders?
-# Therefore supports queries with only one combination of topic + partition (first and only).
+# supports queries with only one combination of topic + partition (first and only).
 
     my $topic_data  = $request->{topics}->[0];
     my $topic_name  = $topic_data->{TopicName};
@@ -466,6 +543,7 @@ sub receive_response_to_request {
 
     unless ( %{ $self->{_metadata} } ) {    # the first request
         $self->_update_metadata( $topic_name )  # hash metadata could be updated
+            # FATAL error
             or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
     my $encoded_request = $protocol{ $api_key }->{encode}->( $request );
@@ -473,19 +551,29 @@ sub receive_response_to_request {
     my $CorrelationId = $request->{CorrelationId} // _get_CorrelationId;
 
     my $retries = $self->{SEND_MAX_RETRIES};
-    my $partition_data;
+    my ( $ErrorCode, $partition_data, $server );
     ATTEMPTS:
     while ( $retries-- ) {
         REQUEST:
         {
+            $ErrorCode = $ERROR_NO_ERROR;
             if ( defined( my $leader = $self->{_metadata}->{ $topic_name }->{ $partition }->{Leader} ) ) {   # hash metadata could be updated
-                my $server = $self->{_leaders}->{ $leader }
-                    or $self->_error( $ERROR_LEADER_NOT_FOUND );
+                unless ( $server = $self->{_leaders}->{ $leader } ) {
+                    $ErrorCode = $ERROR_LEADER_NOT_FOUND;
+                    $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                    last REQUEST;       # go to the next attempt
+                }
 
                 # Send a request to the leader
-                last REQUEST unless
-                       $self->_connectIO( $server )
-                    && $self->_sendIO( $server, $encoded_request );
+                if ( !$self->_connectIO( $server ) ) {
+                    $ErrorCode = $ERROR_CANNOT_BIND;
+                } elsif ( !$self->_sendIO( $server, $encoded_request ) ) {
+                    $ErrorCode = $ERROR_CANNOT_SEND;
+                }
+                if ( $ErrorCode != $ERROR_NO_ERROR ) {
+                    $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
+                    last REQUEST;    # go to the next attempt
+                }
 
                 my $response;
                 if ( $api_key == $APIKEY_PRODUCE && $request->{RequiredAcks} == $NOT_SEND_ANY_RESPONSE ) {
@@ -506,32 +594,60 @@ sub receive_response_to_request {
                             },
                         ],
                     };
-                }
-                else {
-                    my $encoded_response_ref = $self->_receiveIO( $server )
-                        or last REQUEST;
+                } else {
+                    my $encoded_response_ref;
+                    unless ( $encoded_response_ref = $self->_receiveIO( $server ) ) {
+                        if ( $api_key == $APIKEY_PRODUCE ) {
+# WARNING: Unfortunately, the sent package (one or more messages) does not have a unique identifier
+# and there is no way to verify the delivery of data
+                            $ErrorCode = $ERROR_SEND_NO_ACK;
+
+                            # Should not be allowed to re-send data on the next attempt
+                            # FATAL error
+                            $self->_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error} );
+                        } else {
+                            $ErrorCode = $ERROR_CANNOT_RECV;
+                            $self->_remember_nonfatal_error( $ErrorCode, $self->{_IO_cache}->{ $server }->{error}, $server, $topic_name, $partition );
+                            last REQUEST;   # go to the next attempt
+                        }
+                    }
                     $response = $protocol{ $api_key }->{decode}->( $encoded_response_ref );
                 }
 
                 $response->{CorrelationId} == $CorrelationId
+                    # FATAL error
                     or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
                 $topic_data     = $response->{topics}->[0];
                 $partition_data = $topic_data->{ $api_key == $APIKEY_OFFSET ? 'PartitionOffsets' : 'partitions' }->[0];
-                if ( ( my $ErrorCode = $partition_data->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-                    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."', partition = ".$partition_data->{Partition} );
-                }
 
-                return $response;
+                if ( ( $ErrorCode = $partition_data->{ErrorCode} ) == $ERROR_NO_ERROR ) {
+                    return $response;
+                } elsif ( exists $RETRY_ON_ERRORS{ $ErrorCode } ) {
+                    $self->_remember_nonfatal_error( $ErrorCode, $ERROR{ $ErrorCode }, $server, $topic_name, $partition );
+                    last REQUEST;   # go to the next attempt
+                } else {
+                    # FATAL error
+                    $self->_error( $ErrorCode, "topic = '$topic_name', partition = $partition" );
+                }
             }
         }
 
+        # Expect to possible changes in the situation, such as restoration of connection
+        say STDERR sprintf( '[%s] sleeping for %d ms before making request attempt #%d (%s)',
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{SEND_MAX_RETRIES} - $retries + 1,
+                $ErrorCode == $ERROR_NO_ERROR ? 'refreshing metadata' : "ErrorCode ${ErrorCode}",
+            ) if $self->debug_level;
         sleep $self->{RETRY_BACKOFF} / 1000;
+
         $self->_update_metadata( $topic_name )
-            or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
+            # FATAL error
+            or $self->_error( $ErrorCode || $ERROR_CANNOT_GET_METADATA, "topic = '$topic_name', partition = $partition" );
     }
 
-    # NOTE: it is possible to repeat the operation here
-    return;
+    # FATAL error
+    $self->_error( $ErrorCode, "topic = '".$topic_data->{TopicName}."'".( $partition_data ? ", partition = ".$partition_data->{Partition} : q{} ) );
 }
 
 =head3 C<close_connection( $server )>
@@ -586,9 +702,66 @@ sub cluster_errors {
     return \%errors;
 }
 
+=head3 C<nonfatal_errors>
+
+Returns a reference to an array of the last non-fatal errors.
+
+Maximum number of entries is set using C<MaxLoggedErrors> parameter of L<constructor|/new>.
+
+A reference to the empty array is returned if there were no non-fatal errors or parameter C<MaxLoggedErrors>
+is set to 0.
+
+=cut
+sub nonfatal_errors {
+    my ( $self ) = @_;
+
+    return $self->{_nonfatal_errors};
+}
+
+=head3 C<clear_nonfatals>
+
+Clears an array of the last non-fatal errors.
+
+A reference to the empty array is returned because there are no non-fatal errors now.
+
+=cut
+sub clear_nonfatals {
+    my ( $self ) = @_;
+
+    @{ $self->{_nonfatal_errors} } = ();
+
+    return $self->{_nonfatal_errors};
+}
+
 #-- private attributes ---------------------------------------------------------
 
 #-- private methods ------------------------------------------------------------
+
+# Remember non-fatal error
+sub _remember_nonfatal_error {
+    my ( $self, $error_code, $error, $server, $topic, $partition ) = @_;
+
+    my $max_logged_errors = $self->{MaxLoggedErrors}
+        or return;
+
+    shift( @{ $self->{_nonfatal_errors} } )
+        if scalar( @{ $self->{_nonfatal_errors} } ) == $max_logged_errors;
+    my $msg = sprintf( "[%s] Non-fatal error: %s (ErrorCode %s, server '%s', topic '%s', partition %s)",
+        scalar( localtime ),
+        $error      // ( $ERROR{ $error_code } || '<undef>' ),
+        $error_code // 'IO error',
+        $server     // '<undef>',
+        $topic      // '<undef>',
+        $partition  // '<undef>',
+    );
+
+    say STDERR $msg
+        if $self->debug_level;
+
+    push @{ $self->{_nonfatal_errors} }, $msg;
+
+    return $msg;
+}
 
 # Returns identifier of the cluster leader (host:port)
 sub _find_leader_server {
@@ -663,20 +836,16 @@ sub _update_metadata {
 
     my $decoded_response = $protocol{ $APIKEY_METADATA }->{decode}->( $encoded_response_ref );
     $decoded_response->{CorrelationId} == $CorrelationId
+        # FATAL error
         or $self->_error( $ERROR_MISMATCH_CORRELATIONID );
 
     unless ( _ARRAY( $decoded_response->{Broker} ) ) {
         if ( $self->{AutoCreateTopicsEnable} ) {
-            return if $is_recursive_call;
-
-            my $retries = $self->{SEND_MAX_RETRIES};
-            ATTEMPTS:
-            while ( $retries-- ) {
-                sleep $self->{RETRY_BACKOFF} / 1000;
-                return( 1 ) if $self->_update_metadata( $topic, 1 );
-            }
+            return $self->_retry_update_metadata( $is_recursive_call, $topic, undef, $ERROR_NO_KNOWN_BROKERS );
+        } else {
+            # FATAL error
+            $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = '$topic'" );
         }
-        $self->_error( $ERROR_NO_KNOWN_BROKERS, "topic = $topic" );
     }
 
     my $IO_cache = $self->{_IO_cache};
@@ -701,17 +870,21 @@ sub _update_metadata {
     # Collect the received metadata
     my $received_metadata   = {};
     my $leaders             = {};
+
+    my ( $TopicName, $partition );
+    my $ErrorCode = $ERROR_NO_ERROR;
+    METADATA_CREATION:
     foreach my $topic_metadata ( @{ $decoded_response->{TopicMetadata} } ) {
-        my $TopicName = $topic_metadata->{TopicName};
-        if ( ( my $topic_ErrorCode = $topic_metadata->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-            $self->_error( $topic_ErrorCode, "topic = '$TopicName'" );
-        }
+        $partition = undef;
+
+        $TopicName = $topic_metadata->{TopicName};
+        last METADATA_CREATION
+            if ( $ErrorCode = $topic_metadata->{ErrorCode} ) != $ERROR_NO_ERROR;
 
         foreach my $partition_metadata ( @{ $topic_metadata->{PartitionMetadata} } ) {
-            my $partition = $partition_metadata->{Partition};
-            if ( ( my $partition_ErrorCode = $partition_metadata->{ErrorCode} ) != $ERROR_NO_ERROR ) {
-                $self->_error( $partition_ErrorCode, "topic = '$TopicName', partition = $partition" );
-            }
+            $partition = $partition_metadata->{Partition};
+            last METADATA_CREATION
+                if ( $ErrorCode = $partition_metadata->{ErrorCode} ) != $ERROR_NO_ERROR;
 
             my $received_partition_data = $received_metadata->{ $TopicName }->{ $partition } = {};
             my $leader = $received_partition_data->{Leader} = $partition_metadata->{Leader};
@@ -721,15 +894,46 @@ sub _update_metadata {
             $leaders->{ $leader } = $self->_find_leader_server( $leader );
         }
     }
+    if ( $ErrorCode != $ERROR_NO_ERROR ) {
+        if ( $RETRY_ON_ERRORS{ $ErrorCode } ) {
+            return $self->_retry_update_metadata( $is_recursive_call, $TopicName, $partition, $ErrorCode );
+        } else {
+            # FATAL error
+            $self->_error( $ErrorCode, "topic = '$TopicName'", defined( $partition ) ? ", partition = $partition" : () );
+        }
+    }
 
     %$received_metadata
+        # FATAL error
         or $self->_error( $ERROR_CANNOT_GET_METADATA, "topic = '$topic'" );
 
-    # Replace the information in the metadata
-    $self->{_metadata}  = $received_metadata;
-    $self->{_leaders}   = $leaders;
+    # Update metadata for received topics
+    $self->{_metadata}->{ $_ }  = $received_metadata->{ $_ } foreach keys %{ $received_metadata };
+    $self->{_leaders}->{ $_ }   = $leaders->{ $_ } foreach keys %{ $leaders };
 
     return 1;
+}
+
+# trying to get the metadata without error
+sub _retry_update_metadata {
+    my ( $self, $is_recursive_call, $topic, $partition, $error_code ) = @_;
+
+    return if $is_recursive_call;
+    $self->_remember_nonfatal_error( $error_code, $ERROR{ $error_code }, undef, $topic, $partition );
+
+    my $retries = $self->{SEND_MAX_RETRIES};
+    ATTEMPTS:
+    while ( $retries-- ) {
+        say STDERR sprintf( '[%s] sleeping for %d ms before making update metadata attempt #%d',
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+            ) if $self->debug_level;
+        sleep $self->{RETRY_BACKOFF} / 1000;
+        return( 1 ) if $self->_update_metadata( $topic, 1 );
+    }
+    # FATAL error
+    $self->_error( $error_code, "topic = '$topic'", defined( $partition ) ? ", partition = $partition" : () );
 }
 
 # forms server identifier using supplied $host, $port
@@ -743,7 +947,14 @@ sub _build_server_name {
 sub _on_io_error {
     my ( $self, $server_data, $error ) = @_;
 
-    $server_data->{error}   = $error;
+    my $message;
+    if ( !blessed( $error ) || !$error->isa( 'Kafka::Exception' ) ) {
+        $message = $error;
+    } else {
+        $message = $error->message;
+    }
+
+    $server_data->{error}   = $message;
     $server_data->{IO}      = undef;
 }
 
@@ -791,14 +1002,32 @@ sub _receiveIO {
 
     my $server_data = $self->{_IO_cache}->{ $server };
     my $response_ref;
-    try {
-        my $io = $server_data->{IO};
-        $response_ref   = $io->receive( 4 );
-        $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
-    } catch {
-        # NOTE: it is possible to repeat the operation here
-        $self->_on_io_error( $server_data, $_ );
-    };
+
+    my $error;
+    my $retries = $self->{RECEIVE_MAX_RETRIES};
+    ATTEMPTS:
+    while ( $retries-- ) {
+        $error = undef;
+        try {
+            my $io = $server_data->{IO};
+            $response_ref   = $io->receive( 4 ) unless $response_ref;
+            $$response_ref .= ${ $io->receive( unpack( 'l>', $$response_ref ) ) };
+        } catch {
+            $error = $_;
+        };
+        last unless $error;
+
+        say STDERR sprintf( "[%s] sleeping for %d ms before making receive attempt #%d (error '%s')",
+                scalar( localtime ),
+                $self->{RETRY_BACKOFF},
+                $self->{RECEIVE_MAX_RETRIES} - $retries + 1,
+                $error,
+            ) if $self->debug_level;
+        sleep $self->{RETRY_BACKOFF} / 1000;
+    }
+    $self->_on_io_error( $server_data, $_ )
+        if $error;
+
     return $response_ref;
 }
 
@@ -846,12 +1075,14 @@ __END__
 
 =head1 DIAGNOSTICS
 
-When error is detected, an exception, represented by object of C<Kafka::Exception::Connection> class,
+When error is detected, an exception, represented by object of L<Kafka::Exception::Connection|Kafka::Exception::Connection> class,
 is thrown (see L<Kafka::Exceptions|Kafka::Exceptions>).
 
 L<code|Kafka::Exceptions/code> and a more descriptive L<message|Kafka::Exceptions/message> provide
 information about exception. Consult documentation of the L<Kafka::Exceptions|Kafka::Exceptions>
 for the list of all available methods.
+
+Here is the list of possible error messages that C<Kafka::Connection> may produce:
 
 =over 3
 
@@ -892,6 +1123,18 @@ Failed to locate cluster broker.
 Received meta data is incorrect or missing.
 
 =back
+
+=head2 Debug mode
+
+Debug output can be enabled by passing desired level via environment variable
+using one of the following ways:
+
+C<PERL_KAFKA_DEBUG=1>             - debug is enabled for the whole L<Kafka|Kafka> package.
+
+C<PERL_KAFKA_DEBUG=Connection:1>  - enable debug for C<Kafka::Connection> only.
+
+C<Kafka::Connection> prints to C<STDERR> information about non-fatal errors,
+re-connection attempts and such when debug level is set to 1 or higher.
 
 =head1 SEE ALSO
 
@@ -936,6 +1179,8 @@ Sergey Gladkov, E<lt>sgladkov@trackingsoft.comE<gt>
 Alexander Solovey
 
 Jeremy Jordan
+
+Sergiy Zuban
 
 Vlad Marchenko
 
