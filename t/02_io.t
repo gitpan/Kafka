@@ -71,12 +71,17 @@ STDOUT->autoflush;
 
 #-- declarations ---------------------------------------------------------------
 
+my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message, $inet_aton, $hostname );
+
+$inet_aton = inet_aton( '127.0.0.1' );  # localhost
+$hostname = gethostbyaddr( $inet_aton, AF_INET );
+
 my $server_code = sub {
     my ( $port ) = @_;
 
     my $sock = IO::Socket::INET->new(
         LocalPort   => $port,
-        LocalAddr   => 'localhost',
+        LocalAddr   => $hostname,
         Proto       => 'tcp',
         Listen      => 5,
         Type        => SOCK_STREAM,
@@ -100,8 +105,6 @@ sub debug_msg {
     diag '[ time = ', Time::HiRes::time(), ' ] ', $message;
 }
 
-my ( $server, $port, $io, $sig_handler, $marker_signal_handling, $original, $timer, $timeout, $sent, $resp, $test_message, $inet_aton );
-
 #-- Global data ----------------------------------------------------------------
 
 $server = Test::TCP->new( code => $server_code );
@@ -110,7 +113,6 @@ ok $port, "server port = $port";
 wait_port( $port );
 
 $test_message = "Test message\n";
-$inet_aton = inet_aton( 'localhost' );
 
 # INSTRUCTIONS -----------------------------------------------------------------
 
@@ -139,9 +141,9 @@ throws_ok {
     );
 } 'Kafka::Exception::IO', 'error thrown';
 
-debug_msg( "ALRM handler: host => 'localhost'" );
+debug_msg( "ALRM handler: host => $hostname" );
 $io = Kafka::IO->new(
-    host    => 'localhost',
+    host    => $hostname,
     port    => $port,
     timeout => $REQUEST_TIMEOUT,
 );
@@ -254,13 +256,13 @@ Sub::Install::reinstall_sub( {
 } );
 
 debug_msg( "Kafka::IO->new is correctly ended after 'timer' and before 'timeout'" );
-debug_msg( "timer = $timer, timeout = $timeout, host => 'localhost'" );
+debug_msg( "timer = $timer, timeout = $timeout, host => $hostname" );
 $marker_signal_handling = 0;
 eval {
     alarm $timer;
     eval {
         $io = Kafka::IO->new(
-            host    => 'localhost',
+            host    => $hostname,
             port    => $port,
             timeout => $timeout,
         );
@@ -280,7 +282,7 @@ debug_msg( "external 'alarm' tested" );
 #-- is_alive
 
 $io = Kafka::IO->new(
-    host    => 'localhost',
+    host    => $hostname,
     port    => $port,
     timeout => $REQUEST_TIMEOUT,
 );
@@ -300,7 +302,7 @@ ok !$io->is_alive, 'socket not alive';
 #-- send
 
 $io = Kafka::IO->new(
-    host    => 'localhost',
+    host    => $hostname,
     port    => $port,
     timeout => $REQUEST_TIMEOUT,
 );

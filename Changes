@@ -1,5 +1,9 @@
 Revision history for Kafka package
 
+0.8003 Thu Dec  26 2013
+    BUGFIXES:
+    - 'localhost' is no longer used in the t/*_io.t .
+
 0.8002 Thu Dec  26 2013
     CHANGES:
     - Debug diagnostic and test improved.
