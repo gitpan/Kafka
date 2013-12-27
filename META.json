@@ -57,45 +57,45 @@
    "provides" : {
       "Kafka" : {
          "file" : "lib/Kafka.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Connection" : {
          "file" : "lib/Kafka/Connection.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Consumer" : {
          "file" : "lib/Kafka/Consumer.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Exceptions" : {
          "file" : "lib/Kafka/Exceptions.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::IO" : {
          "file" : "lib/Kafka/IO.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Int64" : {
          "file" : "lib/Kafka/Int64.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Internals" : {
          "file" : "lib/Kafka/Internals.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Message" : {
          "file" : "lib/Kafka/Message.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Producer" : {
          "file" : "lib/Kafka/Producer.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       },
       "Kafka::Protocol" : {
          "file" : "lib/Kafka/Protocol.pm",
-         "version" : "0.8003"
+         "version" : "0.8004"
       }
    },
    "release_status" : "stable",
-   "version" : "0.8003"
+   "version" : "0.8004"
 }
