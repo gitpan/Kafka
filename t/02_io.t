@@ -149,9 +149,8 @@ eval {
         timeout => $REQUEST_TIMEOUT,
     );
 };
-if ( $@ ) {
-    diag "gethostbyname( '$hostname' ) takes too long: $@";
-} else {
+SKIP: {
+    skip "gethostbyname( '$hostname' ) takes too long: $@" if $@;
 
     isa_ok( $io, 'Kafka::IO' );
 
@@ -285,47 +284,47 @@ if ( $@ ) {
 
     debug_msg( "external 'alarm' tested" );
 
+    #-- is_alive
+
+    $io = Kafka::IO->new(
+        host    => $hostname,
+        port    => $port,
+        timeout => $REQUEST_TIMEOUT,
+    );
+
+    ok $io->is_alive, 'socket alive';
+
+    #-- close
+
+    ok $io->{socket}, 'socket defined';
+    $io->close;
+    ok !$io->{socket}, 'socket not defined';
+
+    #-- is_alive
+
+    ok !$io->is_alive, 'socket not alive';
+
+    #-- send
+
+    $io = Kafka::IO->new(
+        host    => $hostname,
+        port    => $port,
+        timeout => $REQUEST_TIMEOUT,
+    );
+
+    lives_ok { $sent = $io->send( $test_message ); } 'expecting to live';
+    is $sent, length( $test_message ), 'sent '.length( $test_message ).' bytes';
+
+    #-- receive
+
+    lives_ok { $resp = $io->receive( length( $test_message ) ); } 'expecting to live';
+    is( $$resp, $test_message, 'receive OK' );
+
+    undef $server;
+    ok $io, 'IO exists';
+    throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
+
 }
-
-#-- is_alive
-
-$io = Kafka::IO->new(
-    host    => $hostname,
-    port    => $port,
-    timeout => $REQUEST_TIMEOUT,
-);
-
-ok $io->is_alive, 'socket alive';
-
-#-- close
-
-ok $io->{socket}, 'socket defined';
-$io->close;
-ok !$io->{socket}, 'socket not defined';
-
-#-- is_alive
-
-ok !$io->is_alive, 'socket not alive';
-
-#-- send
-
-$io = Kafka::IO->new(
-    host    => $hostname,
-    port    => $port,
-    timeout => $REQUEST_TIMEOUT,
-);
-
-lives_ok { $sent = $io->send( $test_message ); } 'expecting to live';
-is $sent, length( $test_message ), 'sent '.length( $test_message ).' bytes';
-
-#-- receive
-
-lives_ok { $resp = $io->receive( length( $test_message ) ); } 'expecting to live';
-is( $$resp, $test_message, 'receive OK' );
-
-undef $server;
-ok $io, 'IO exists';
-throws_ok { $sent = $io->send( $test_message ); } 'Kafka::Exception::IO', 'error thrown';
 
 # POSTCONDITIONS ---------------------------------------------------------------
 
