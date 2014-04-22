@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use 5.010;
 
-if ( $^O eq 'MSWin32' || $^O eq 'solaris' ) {
+if ( $^O eq 'MSWin32' || $^O eq 'solaris' ||  $^O eq 'cygwin' ) {
     print STDERR "OS unsupported: $^O\n";
     exit( 255 );
 }
@@ -21,25 +21,88 @@ my %config = (
     VERSION_FROM        => 'lib/Kafka.pm',  # finds $VERSION
     MIN_PERL_VERSION    => '5.010',
     PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
-        'Const::Fast'           => '0.014',
-        'Data::HexDump::Range'  => 0.13,
-        'Exception::Class'      => 1.37,
-        'List::MoreUtils'       => 0.33,
-        'Params::Util'          => 1.07,
-        'Scalar::Util::Numeric' => 0.22,
-        'String::CRC32'         => '1.4',
-        'Sys::SigAction'        => 0.15,
-        'Try::Tiny'             => 0.18,
+        'Carp'                      => '1.3301',
+        'Compress::Snappy'          => '0.23',
+        'Config'                    => '0.0',
+        'Const::Fast'               => '0.014',
+        'Data::Compare'             => '1.24',
+        'Data::HexDump::Range'      => '0.13',
+        'Errno'                     => '0.0',
+        'Exception::Class'          => '1.37',
+        'Exporter'                  => '5.70',
+        'Fcntl'                     => '1.11',
+        'File::Spec::Functions'     => '3.40',
+        'IO::Compress::Gzip'        => '2.064',
+        'IO::Uncompress::Gunzip'    => '2.064',
+        'List::MoreUtils'           => '0.33',
+        'List::Util'                => '1.38',
+        'Params::Util'              => '1.07',
+        'POSIX'                     => '1.32',
+        'Scalar::Util'              => '1.38',
+        'Scalar::Util::Numeric'     => '0.22',
+        'Socket'                    => '2.013',
+        'String::CRC32'             => '1.4',
+        'Sys::SigAction'            => '0.15',
+        'Time::HiRes'               => '1.9726',
+        'Try::Tiny'                 => '0.18',
     },
     BUILD_REQUIRES      => {            # more to the list $Module::CoreList::version{5.010}
-        'Capture::Tiny'         => 0.22,
-        'Clone'                 => 0.35,
-        'Config::IniFiles'      => 2.82,
-        'Proc::Daemon'          => 0.14,
-        'Sub::Install'          => 0.926,
-        'Test::Deep'            => 0.109,
-        'Test::Exception'       => 0.31,
-        'Test::TCP'             => 2.00,
+        'Capture::Tiny'             => '0.22',
+        'Carp'                      => '1.3301',
+        'Clone'                     => '0.35',
+        'Config::IniFiles'          => '2.82',
+        'Const::Fast'               => '0.014',
+        'Cwd'                       => '3.40',
+        'Data::Dumper'              => '2.151',
+        'Exporter'                  => '5.70',
+        'File::Copy'                => '2.26',
+        'File::Find'                => '1.23',
+        'File::HomeDir'             => '1.00',
+        'File::Path'                => '2.09',
+        'File::Spec'                => '3.40',
+        'File::Spec::Functions'     => '3.40',
+        'FindBin'                   => '1.51',
+        'Getopt::Long'              => '2.42',
+        'IO::File'                  => '1.16',
+        'IO::Socket::INET'          => '1.33',
+        'List::Util'                => '1.38',
+        'Module::CPANTS::Analyse'   => '0.92',
+        'Net::EmptyPort'            => '0.0',
+        'Params::Util'              => '1.07',
+        'POSIX'                     => '1.32',
+        'Proc::Daemon'              => '0.14',
+        'Scalar::Util'              => '1.38',
+        'Scalar::Util::Numeric'     => '0.22',
+        'Socket'                    => '2.013',
+        'Sub::Install'              => '0.926',
+        'Sys::SigAction'            => '0.15',
+        'Test::Deep'                => '0.109',
+# Argument "1.1.3" isn't numeric in numeric lt (<) at /usr/local/share/perl/5.18.2/ExtUtils/MakeMaker.pm line 528.
+#        'Test::Dist::VersionSync'   => '1.1.3',
+        'Test::Distribution'        => '2.00',
+        'Test::EOL'                 => '1.5',
+        'Test::Exception'           => '0.31',
+        'Test::Fixme'               => '0.10',
+        'Test::Kwalitee'            => '1.18',
+# Argument "v0.2.1" isn't numeric in numeric lt (<) at /usr/local/share/perl/5.18.2/ExtUtils/MakeMaker.pm line 528.
+#        'Test::Kwalitee::Extra'     => 'v0.2.1',
+        'Test::MinimumVersion'      => '0.101081',
+        'Test::Mojibake'            => '0.9',
+        'Test::More'                => '1.001003',
+        'Test::NoTabs'              => '1.3',
+        'Test::NoWarnings'          => '1.04',
+        'Test::Perl::Critic'        => '1.02',
+        'Test::Pod'                 => '1.48',
+        'Test::Pod::Coverage'       => '1.08',
+        'Test::PureASCII'           => '0.02',
+        'Test::Spelling'            => '0.19',
+        'Test::Strict'              => '0.23',
+        'Test::Synopsis'            => '0.10',
+        'Test::TCP'                 => '2.00',
+        'Test::Vars'                => '0.005',
+        'Test::Version'             => '1.002004',
+        'Time::HiRes'               => '1.9726',
+        'Try::Tiny'                 => '0.18',
     },
     META_MERGE          => {
         no_index                => {
@@ -53,43 +116,43 @@ my %config = (
         provides                => {
             'Kafka'                 => {
                 file                    => 'lib/Kafka.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Connection'     => {
                 file                    => 'lib/Kafka/Connection.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Consumer'       => {
                 file                    => 'lib/Kafka/Consumer.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Exceptions'     => {
                 file                    => 'lib/Kafka/Exceptions.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::IO'             => {
                 file                    => 'lib/Kafka/IO.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Int64'          => {
                 file                    => 'lib/Kafka/Int64.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Internals'      => {
                 file                    => 'lib/Kafka/Internals.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Message'        => {
                 file                    => 'lib/Kafka/Message.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Producer'       => {
                 file                    => 'lib/Kafka/Producer.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
             'Kafka::Protocol'       => {
                 file                    => 'lib/Kafka/Protocol.pm',
-                version                 => '0.8007'
+                version                 => '0.8007_1'
             },
         },
     },

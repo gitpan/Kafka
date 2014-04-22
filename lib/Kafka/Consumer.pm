@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.8007 .
+This documentation refers to C<Kafka::Consumer> version 0.8007_1 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007';
+our $VERSION = '0.8007_1';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -40,7 +40,7 @@ use Kafka qw(
     $DEFAULT_MAX_NUMBER_OF_OFFSETS
     $DEFAULT_MAX_WAIT_TIME
     %ERROR
-    $ERROR_COMPRESSED_PAYLOAD
+    $ERROR_METADATA_ATTRIBUTES
     $ERROR_MISMATCH_ARGUMENT
     $ERROR_PARTITION_DOES_NOT_MATCH
     $ERROR_TOPIC_DOES_NOT_MATCH
@@ -153,7 +153,7 @@ Provides an object-oriented API for consuming messages.
 
 =item *
 
-Provides Kafka FETCH and OFFSETS requests (FETCH does not support compression codec).
+Provides Kafka FETCH and OFFSETS requests.
 
 =item *
 
@@ -402,7 +402,12 @@ sub fetch {
                     $offset = Kafka::Int64::intsum( $offset, 0 );
                     $next_offset = Kafka::Int64::intsum( $offset, 1 );
                 }
-                my $message_error = $Message->{Attributes} ? $ERROR{ $ERROR_COMPRESSED_PAYLOAD } : q{};
+
+                # According to Apache Kafka documentation:
+                # This byte holds metadata attributes about the message.
+                # The lowest 2 bits contain the compression codec used for the message.
+                # The other bits should be set to 0.
+                my $message_error = $Message->{Attributes} >> 2 ? $ERROR{ $ERROR_METADATA_ATTRIBUTES } : q{};
 
                 push( @$messages, Kafka::Message->new( {
                         Attributes          => $Message->{Attributes},
@@ -609,6 +614,11 @@ A wealth of detail about the Apache Kafka and the Kafka Protocol:
 Main page at L<http://kafka.apache.org/>
 
 Kafka Protocol at L<https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol>
+
+=head1 SOURCE CODE
+
+Kafka package is hosted on GitHub:
+L<https://github.com/TrackingSoft/Kafka>
 
 =head1 AUTHOR
 

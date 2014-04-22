@@ -1,4 +1,4 @@
-Kafka package version 0.8007
+Kafka package version 0.8007_1
 ============================
 
 The Kafka package is a set of Perl modules which provides a
@@ -28,8 +28,11 @@ packages that are distributed separately from Perl. We recommend that
 you have the following packages installed before you install
 Kafka:
 
+   Compress::Snappy
    Const::Fast
    Exception::Class
+   IO::Compress::Gzip
+   IO::Uncompress::Gunzip
    List::MoreUtils
    Params::Util
    Scalar::Util::Numeric
