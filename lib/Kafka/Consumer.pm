@@ -6,7 +6,7 @@ Kafka::Consumer - Perl interface for Kafka consumer client.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Consumer> version 0.8007_1 .
+This documentation refers to C<Kafka::Consumer> version 0.8007_2 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007_1';
+our $VERSION = '0.8007_2';
 
 #-- load the modules -----------------------------------------------------------
 
@@ -314,7 +314,7 @@ The following methods are defined for the C<Kafka::Consumer> class:
 
 #-- public methods -------------------------------------------------------------
 
-=head3 C<fetch( $topic, $partition, $offset, $max_size )>
+=head3 C<fetch( $topic, $partition, $start_offset, $max_size )>
 
 Get a list of messages to consume one by one up to C<$max_size> bytes.
 
@@ -332,7 +332,7 @@ The C<$topic> must be a normal non-false string of non-zero length.
 
 The C<$partition> must be a non-negative integer.
 
-=item C<$offset>
+=item C<$start_offset>
 
 Offset in topic and partition to start from (64-bit integer).
 
@@ -351,14 +351,15 @@ can be imported from L<Kafka|Kafka> module.
 
 =cut
 sub fetch {
-    my ( $self, $topic, $partition, $offset, $max_size ) = @_;
+    my ( $self, $topic, $partition, $start_offset, $max_size, $_return_all ) = @_;
+    # Special argument: $_return_all - return redundant messages sent out of a compressed package posts
 
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$topic' )
         unless defined( $topic ) && ( $topic eq q{} || defined( _STRING( $topic ) ) ) && !utf8::is_utf8( $topic );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$partition' )
         unless defined( $partition ) && isint( $partition );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, '$offset' )
-        unless defined( $offset ) && ( ( _isbig( $offset ) && $offset >= 0 ) || defined( _NONNEGINT( $offset ) ) );
+        unless defined( $start_offset ) && ( ( _isbig( $start_offset ) && $start_offset >= 0 ) || defined( _NONNEGINT( $start_offset ) ) );
     $self->_error( $ERROR_MISMATCH_ARGUMENT, "\$max_size ($max_size)" )
         unless ( !defined( $max_size ) || ( ( _isbig( $max_size ) || _POSINT( $max_size ) ) && $max_size >= $MESSAGE_SIZE_OVERHEAD && $max_size <= $MAX_INT32 ) );
 
@@ -374,7 +375,7 @@ sub fetch {
                 partitions                  => [
                     {
                         Partition           => $partition,
-                        FetchOffset         => $offset,
+                        FetchOffset         => $start_offset,
                         MaxBytes            => $max_size // $self->{MaxBytes},
                     },
                 ],
@@ -402,6 +403,9 @@ sub fetch {
                     $offset = Kafka::Int64::intsum( $offset, 0 );
                     $next_offset = Kafka::Int64::intsum( $offset, 1 );
                 }
+
+                # skip previous messages of a compressed package posts
+                next if $offset < $start_offset && !$_return_all;
 
                 # According to Apache Kafka documentation:
                 # This byte holds metadata attributes about the message.

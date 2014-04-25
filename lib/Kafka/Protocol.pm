@@ -6,7 +6,7 @@ Kafka::Protocol - Functions to process messages in the Apache Kafka protocol.
 
 =head1 VERSION
 
-This documentation refers to C<Kafka::Protocol> version 0.8007_1 .
+This documentation refers to C<Kafka::Protocol> version 0.8007_2 .
 
 =cut
 
@@ -18,7 +18,7 @@ use warnings;
 
 # ENVIRONMENT ------------------------------------------------------------------
 
-our $VERSION = '0.8007_1';
+our $VERSION = '0.8007_2';
 
 use Exporter qw(
     import
@@ -1177,6 +1177,7 @@ sub _decode_MessageSet_array {
             } elsif ( $compression_codec == $COMPRESSION_SNAPPY ) {
                 my ( $header, $x_version, $x_compatversion, undef ) = unpack( q{a[8]L>L>L>}, $Message->{Value} );   # undef - $x_length
 
+                # Special thanks to Ed Silva
                 if ( $header eq "\x82SNAPPY\x00" ) {
                     # Found a xerial header.... nonstandard snappy compression header, remove the header
                     if ( $x_compatversion == 1 && $x_version == 1 ) {
